@@ -897,7 +897,7 @@ export default function Home() {
 
   const saveAndNext=async(value:string)=>{
     if(!step)return
-    const next={...answers,[step.id]:value}
+    const next:Record<string,any>={...answers,[step.id]:value}
     // store fluency counts separately for scoring
     if(step.type==="fluency_animals"){
       next["animal_fluency_count"]=value
