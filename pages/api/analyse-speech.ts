@@ -60,7 +60,7 @@ Reply ONLY with JSON (no markdown, no extra text):
     // Extra safety: if transcript closely matches, boost score
     const targetWords = sentence.toLowerCase().split(' ')
     const transcriptLower = transcript.toLowerCase()
-    const matchedWords = targetWords.filter(w => transcriptLower.includes(w.replace(/[.,]/g,'')))
+    const matchedWords = targetWords.filter((w:string) => transcriptLower.includes(w.replace(/[.,]/g,'')))
     const matchPct = matchedWords.length / targetWords.length
 
     let finalScore = parsed.score ?? 0
