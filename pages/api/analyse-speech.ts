@@ -77,7 +77,7 @@ Reply ONLY with JSON (no markdown, no extra text):
     // On error, do basic word matching instead of defaulting to 3
     const targetWords = sentence.toLowerCase().split(' ')
     const transcriptLower = (transcript||'').toLowerCase()
-    const matched = targetWords.filter(w => transcriptLower.includes(w.replace(/[.,]/g,''))).length
+    const matched = targetWords.filter((w:string) => transcriptLower.includes(w.replace(/[.,]/g,''))).length
     const pct = matched / targetWords.length
     const score = pct >= 0.95 ? 5 : pct >= 0.85 ? 4 : pct >= 0.65 ? 3 : pct >= 0.4 ? 2 : 1
     res.json({ score, note: `Speech captured and evaluated — matched ${Math.round(pct*100)}% of target words.` })
