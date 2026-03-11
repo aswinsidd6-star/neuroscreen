@@ -709,7 +709,7 @@ function PictureDescribeStep({onNext}:any) {
   const [result,setResult]=useState<{score:number;note:string}|null>(null)
 
   const analyse=async()=>{
-    if(val.trim().length<5)return
+    if(val.trim().length<10)return
     setLoading(true)
     try{
       const res=await fetch("/api/analyse-picture",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({description:val,type:"picture"})})
@@ -721,31 +721,127 @@ function PictureDescribeStep({onNext}:any) {
 
   return(
     <div>
-      <p style={{color:"#9ca3af",fontSize:14,marginBottom:16,lineHeight:1.75}}>Describe every person, every action, every object. The more detail the better.</p>
-      <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.09)",borderRadius:14,padding:"18px",marginBottom:18}}>
-        <p style={{color:"#6b7280",fontSize:11,fontFamily:"monospace",letterSpacing:"0.08em",marginBottom:14,textAlign:"center"}}>🖼️ KITCHEN SCENE</p>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,textAlign:"center",marginBottom:12}}>
-          {[["👩‍🍳","Woman cooking"],["🧒","Child climbing"],["🍪","Cookie jar"],["🚿","Water overflowing"],["🍽️","Dishes on shelf"],["🪟","Open window"]].map(([e,l])=>(
-            <div key={l as string} style={{background:"rgba(255,255,255,0.03)",borderRadius:10,padding:"10px 4px"}}>
-              <div style={{fontSize:34,marginBottom:4}}>{e}</div>
-              <p style={{fontSize:10,color:"#6b7280",lineHeight:1.4}}>{l}</p>
-            </div>
-          ))}
-        </div>
-        <p style={{color:"#6b7280",fontSize:12,textAlign:"center",lineHeight:1.6}}>Who is there? What are they doing? Is anything going wrong?</p>
+      <p style={{color:"#9ca3af",fontSize:14,marginBottom:14,lineHeight:1.75}}>
+        Look carefully at this picture. Describe <strong style={{color:"#e5e7eb"}}>every person, every action, every object</strong> you can see. The more detail the better.
+      </p>
+
+      {/* Boston Cookie Theft Scene — detailed SVG */}
+      <div style={{background:"#f5ede0",borderRadius:16,padding:"12px",marginBottom:16,border:"2px solid rgba(200,160,106,0.4)"}}>
+        <p style={{color:"#7a5230",fontSize:10,fontFamily:"monospace",letterSpacing:"0.08em",textAlign:"center",marginBottom:8}}>🖼️ LOOK AT THIS PICTURE CAREFULLY — describe everything you see</p>
+        <svg viewBox="0 0 500 300" style={{width:"100%",borderRadius:10,display:"block"}} xmlns="http://www.w3.org/2000/svg">
+          {/* Wall */}
+          <rect width="500" height="300" fill="#f0e6d3"/>
+          {/* Floor */}
+          <rect x="0" y="220" width="500" height="80" fill="#d4b896"/>
+          <line x1="0" y1="220" x2="500" y2="220" stroke="#b8956a" strokeWidth="2"/>
+          {/* Window */}
+          <rect x="25" y="35" width="95" height="110" fill="#b8d9f0" stroke="#8b7355" strokeWidth="2.5" rx="3"/>
+          <line x1="72" y1="35" x2="72" y2="145" stroke="#8b7355" strokeWidth="2"/>
+          <line x1="25" y1="90" x2="120" y2="90" stroke="#8b7355" strokeWidth="2"/>
+          <rect x="25" y="35" width="20" height="110" fill="#e8c4a0" opacity="0.5"/>
+          <rect x="100" y="35" width="20" height="110" fill="#e8c4a0" opacity="0.5"/>
+          {/* Cupboard */}
+          <rect x="295" y="15" width="190" height="125" fill="#c8a06a" stroke="#8b7355" strokeWidth="2" rx="3"/>
+          <line x1="390" y1="15" x2="390" y2="140" stroke="#8b7355" strokeWidth="2"/>
+          <rect x="295" y="15" width="95" height="125" fill="#e0b87a" stroke="#8b7355" strokeWidth="1.5" rx="2"/>
+          {/* Cookie jar */}
+          <rect x="308" y="50" width="52" height="70" fill="#cd853f" stroke="#8b5a2b" strokeWidth="2" rx="7"/>
+          <rect x="311" y="44" width="46" height="14" fill="#a0522d" rx="4"/>
+          <text x="334" y="92" fill="#fff" fontSize="9" fontFamily="monospace" textAnchor="middle">COOKIES</text>
+          {/* Falling cookies */}
+          <circle cx="365" cy="105" r="9" fill="#d2691e" stroke="#8b4513" strokeWidth="1.5"/>
+          <circle cx="350" cy="118" r="8" fill="#d2691e" stroke="#8b4513" strokeWidth="1.5"/>
+          <circle cx="372" cy="122" r="7" fill="#d2691e" stroke="#8b4513" strokeWidth="1.5"/>
+          <circle cx="363" cy="102" r="2" fill="#4a2800"/><circle cx="369" cy="108" r="2" fill="#4a2800"/>
+          <circle cx="347" cy="116" r="2" fill="#4a2800"/><circle cx="354" cy="121" r="2" fill="#4a2800"/>
+          {/* Stool — tipping */}
+          <rect x="325" y="158" width="58" height="7" fill="#8b7355" rx="3" transform="rotate(-8,325,158)"/>
+          <rect x="330" y="164" width="7" height="56" fill="#8b7355"/>
+          <rect x="366" y="164" width="7" height="56" fill="#8b7355"/>
+          {/* tipping arrow */}
+          <path d="M320,155 L305,168" stroke="#ef4444" strokeWidth="2" strokeDasharray="4" markerEnd="url(#arr)"/>
+          {/* BOY */}
+          <circle cx="352" cy="98" r="17" fill="#fdbcb4"/>
+          <path d="M335,90 Q352,76 369,90" fill="#4a3728"/>
+          <rect x="337" y="113" width="30" height="46" fill="#4a90d9" rx="5"/>
+          {/* reaching arm */}
+          <line x1="367" y1="125" x2="392" y2="88" stroke="#fdbcb4" strokeWidth="9" strokeLinecap="round"/>
+          <circle cx="395" cy="85" r="7" fill="#fdbcb4"/>
+          {/* other arm */}
+          <line x1="337" y1="125" x2="320" y2="142" stroke="#fdbcb4" strokeWidth="9" strokeLinecap="round"/>
+          <rect x="340" y="157" width="11" height="9" fill="#1e3a6e"/>
+          <rect x="356" y="157" width="11" height="9" fill="#1e3a6e"/>
+          {/* GIRL */}
+          <circle cx="272" cy="132" r="15" fill="#fdbcb4"/>
+          <path d="M257,126 Q272,113 287,126" fill="#6b3a2a"/>
+          <rect x="258" y="145" width="28" height="44" fill="#e879a0" rx="5"/>
+          <line x1="258" y1="158" x2="240" y2="172" stroke="#fdbcb4" strokeWidth="7" strokeLinecap="round"/>
+          <line x1="286" y1="158" x2="304" y2="152" stroke="#fdbcb4" strokeWidth="7" strokeLinecap="round"/>
+          <rect x="262" y="187" width="9" height="35" fill="#c0392b"/>
+          <rect x="275" y="187" width="9" height="35" fill="#c0392b"/>
+          <rect x="260" y="220" width="13" height="5" fill="#222" rx="2"/>
+          <rect x="273" y="220" width="13" height="5" fill="#222" rx="2"/>
+          {/* SINK */}
+          <rect x="128" y="175" width="118" height="50" fill="#a8bcd4" stroke="#7a9bb5" strokeWidth="2" rx="3"/>
+          <rect x="138" y="183" width="98" height="35" fill="#7fb3d3" rx="3"/>
+          {/* faucet */}
+          <rect x="180" y="163" width="7" height="20" fill="#999"/>
+          <rect x="172" y="163" width="23" height="5" fill="#999" rx="3"/>
+          {/* OVERFLOWING WATER */}
+          <path d="M138,218 Q148,232 143,250 Q158,240 153,255 Q168,245 163,260 Q178,250 173,264 Q188,254 183,268 Q198,260 205,272 Q218,262 222,275 Q232,265 236,278 L138,278Z" fill="#7fb3d3" opacity="0.75"/>
+          <ellipse cx="165" cy="250" rx="14" ry="4" fill="#7fb3d3" opacity="0.6"/>
+          <ellipse cx="200" cy="262" rx="16" ry="4" fill="#7fb3d3" opacity="0.55"/>
+          {/* WOMAN */}
+          <circle cx="162" cy="128" r="18" fill="#fdbcb4"/>
+          <path d="M144,121 Q162,106 180,121 Q180,108 162,103 Q144,108 144,121Z" fill="#8b6347"/>
+          <rect x="146" y="144" width="33" height="52" fill="#7c5cbf" rx="5"/>
+          <rect x="150" y="150" width="25" height="43" fill="#f0e6d3" opacity="0.65" rx="3"/>
+          {/* drying arm */}
+          <line x1="146" y1="160" x2="126" y2="180" stroke="#fdbcb4" strokeWidth="8" strokeLinecap="round"/>
+          <ellipse cx="114" cy="186" rx="16" ry="20" fill="#e8e8e8" stroke="#ccc" strokeWidth="2"/>
+          {/* other arm to sink */}
+          <line x1="179" y1="160" x2="196" y2="176" stroke="#fdbcb4" strokeWidth="8" strokeLinecap="round"/>
+          <rect x="150" y="194" width="11" height="28" fill="#4a3060"/>
+          <rect x="165" y="194" width="11" height="28" fill="#4a3060"/>
+          <rect x="148" y="220" width="15" height="5" fill="#222" rx="2"/>
+          <rect x="163" y="220" width="15" height="5" fill="#222" rx="2"/>
+          {/* Counter shelf */}
+          <rect x="128" y="225" width="362" height="10" fill="#c8a06a" stroke="#8b7355" strokeWidth="1"/>
+          {/* Plate on counter */}
+          <ellipse cx="455" cy="224" rx="28" ry="7" fill="#e8e8e8" stroke="#ccc" strokeWidth="1"/>
+          {/* Label arrows */}
+          <text x="352" y="295" fill="#7a5230" fontSize="8" fontFamily="monospace" textAnchor="middle">boy stealing cookies</text>
+          <text x="162" y="295" fill="#1a6491" fontSize="8" fontFamily="monospace" textAnchor="middle">water overflowing</text>
+          <text x="272" y="295" fill="#9a2070" fontSize="8" fontFamily="monospace" textAnchor="middle">girl watching</text>
+        </svg>
+        <p style={{color:"#8b7355",fontSize:11,textAlign:"center",marginTop:6,fontFamily:"monospace",lineHeight:1.6}}>
+          Tell us everything: Who is there? What are they doing? Is anything wrong?
+        </p>
       </div>
-      <textarea className="inp" rows={5} placeholder="Type everything you see in this picture…" value={val}
-        onChange={e=>setVal(e.target.value)} style={{resize:"none",minHeight:110,fontSize:15}}/>
+
+      <textarea className="inp" rows={6}
+        placeholder="Describe everything you see: the people, what they are doing, what objects are there, anything unusual happening…"
+        value={val} onChange={e=>setVal(e.target.value)}
+        style={{resize:"none",minHeight:130,fontSize:15}}/>
+
+      <div style={{background:"rgba(99,102,241,0.06)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:10,padding:"10px 14px",marginTop:10,marginBottom:14}}>
+        <p style={{color:"#a5b4fc",fontSize:12,lineHeight:1.6}}>
+          💡 Look carefully — describe the woman, the child, the water, the cupboard, the stool. More detail = better score.
+        </p>
+      </div>
+
       {!result?(
-        <button className="btn-green" style={{marginTop:14,width:"100%",fontSize:17,padding:"15px",opacity:val.trim().length>5?1:0.4}}
-          onClick={analyse} disabled={loading||val.trim().length<5}>
-          {loading?"AI is analysing your description…":"Submit →"}
+        <button className="btn-green" style={{width:"100%",fontSize:17,padding:"15px",opacity:val.trim().length>10?1:0.4}}
+          onClick={analyse} disabled={loading||val.trim().length<10}>
+          {loading?"AI is deeply analysing your description…":"Submit Description →"}
         </button>
       ):(
-        <div style={{marginTop:14,display:"flex",alignItems:"center",gap:12,background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:12,padding:"14px 16px"}}>
-          <span style={{fontSize:24,fontWeight:700,color:"#34d399",fontFamily:"monospace",flexShrink:0}}>{result.score}/5</span>
-          <p style={{fontSize:13,color:"#9ca3af",flex:1,lineHeight:1.6}}>{result.note}</p>
-          <button className="btn-green" style={{padding:"11px 20px",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>onNext(String(result.score))}>Next →</button>
+        <div style={{marginTop:14,background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:12,padding:"16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+            <span style={{fontSize:28,fontWeight:700,color:"#34d399",fontFamily:"monospace",flexShrink:0}}>{result.score}/5</span>
+            <p style={{fontSize:13,color:"#9ca3af",flex:1,lineHeight:1.6}}>{result.note}</p>
+          </div>
+          <button className="btn-green" style={{width:"100%",padding:"12px 20px",fontSize:16}} onClick={()=>onNext(String(result.score))}>Continue →</button>
         </div>
       )}
     </div>
@@ -996,10 +1092,12 @@ export default function Home() {
 
   const saveAndNext=async(value:string)=>{
     if(!step)return
-    const next={...answers,[step.id]:value} as Record<string,string>
+    const next={...answers,[step.id]:value}
     if(step.type==="fluency_animals") next["animal_fluency_count"]=value
     if(step.type==="fluency_letter")  next["letter_fluency_count"]=value
     // Store session meta so scoring uses the right answers
+    if(step.id==="clock_draw")    next["clock_score"]=value
+    if(step.id==="pentagon_draw") next["pentagon_score"]=value
     next["_serial_answers"] = JSON.stringify(session.meta.serialAnswers)
     next["_digit_answers"]  = JSON.stringify(session.meta.digitAnswers)
     next["_word_set"]       = JSON.stringify(session.meta.wordSet.words)
