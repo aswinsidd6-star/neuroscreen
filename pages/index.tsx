@@ -1092,7 +1092,7 @@ export default function Home() {
 
   const saveAndNext=async(value:string)=>{
     if(!step)return
-    const next={...answers,[step.id]:value}
+    const next={...answers,[step.id]:value} as Record<string,string>
     if(step.type==="fluency_animals") next["animal_fluency_count"]=value
     if(step.type==="fluency_letter")  next["letter_fluency_count"]=value
     // Store session meta so scoring uses the right answers
