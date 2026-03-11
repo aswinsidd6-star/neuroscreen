@@ -1,159 +1,211 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import Head from "next/head"
 import { supabase } from "../lib/supabase"
-import { MEMORY_WORDS, MEMORY_CUES, computeScore, SECTION_STYLE } from "../lib/scoring"
+import { computeScore, SECTION_STYLE } from "../lib/scoring"
 
-// ═══ ALL STEPS — plain language, clinically upgraded ═══════════════════════
-const ALL_STEPS = [
-  // INTRO
-  {id:"name",  type:"text",   section:"intro",prompt:"What is your full name?",placeholder:"Type your name here…"},
-  {id:"age",   type:"number", section:"intro",prompt:"How old are you?",placeholder:"Enter your age…"},
-  {id:"gender",type:"select", section:"intro",prompt:"What is your gender?",options:["Male","Female","Prefer not to say"]},
+// ═══ QUESTION POOLS — randomly selected each session ══════════════════════
+const WORD_SETS = [
+  { words: ["Apple","Table","Penny"],   cues: ["a fruit","a piece of furniture","a coin"] },
+  { words: ["Candle","River","Doctor"], cues: ["you light it","it flows with water","a medical person"] },
+  { words: ["Tiger","Chair","Bread"],   cues: ["a wild animal","you sit on it","a food you eat"] },
+]
 
-  // MEMORY — word plant (FCSRT)
-  {id:"memory_plant",type:"memory_display",section:"Memory",
-    prompt:"Look at these 3 words carefully.",
-    subtext:"Say each word out loud 2–3 times. You will need to remember them at the very end."},
+const SERIAL_STARTS = [
+  { start: 100, answers: [93,86,79,72,65] },
+  { start: 98,  answers: [91,84,77,70,63] },
+  { start: 95,  answers: [88,81,74,67,60] },
+]
 
-  // ORIENTATION
-  {id:"orient_year", type:"typed",section:"Orientation",prompt:"What year is it today?",placeholder:"e.g. 2026"},
-  {id:"orient_month",type:"typed",section:"Orientation",prompt:"What month is it right now?",placeholder:"e.g. March"},
-  {id:"orient_day",  type:"typed",section:"Orientation",prompt:"What day of the week is today?",placeholder:"e.g. Monday"},
-  {id:"orient_date", type:"typed",section:"Orientation",prompt:"What is today's date — just the number?",placeholder:"e.g. 9"},
-  {id:"orient_place",type:"typed",section:"Orientation",prompt:"What city or town are you in right now?",placeholder:"Type the city name…"},
+const DIGIT_SETS = [
+  { d2:{shown:"2 – 4",      answer:"42",   hint:"4 first, then 2"},
+    d3:{shown:"5 – 7 – 3",  answer:"375",  hint:"3, then 7, then 5"},
+    d4:{shown:"1 – 2 – 4 – 8",answer:"8421",hint:"8, 4, 2, 1"} },
+  { d2:{shown:"7 – 3",      answer:"37",   hint:"3 first, then 7"},
+    d3:{shown:"4 – 9 – 2",  answer:"294",  hint:"2, then 9, then 4"},
+    d4:{shown:"3 – 6 – 1 – 8",answer:"8163",hint:"8, 1, 6, 3"} },
+  { d2:{shown:"9 – 1",      answer:"19",   hint:"1 first, then 9"},
+    d3:{shown:"6 – 2 – 8",  answer:"826",  hint:"8, then 2, then 6"},
+    d4:{shown:"5 – 1 – 7 – 4",answer:"4715",hint:"4, 7, 1, 5"} },
+]
 
-  // ATTENTION — Serial 7s
-  {id:"s7_1",type:"typed",section:"Attention",prompt:"Start with 100 and take away 7. What do you get?",placeholder:"Your answer…",hint:"100 minus 7 = ?"},
-  {id:"s7_2",type:"typed",section:"Attention",prompt:"Now take away 7 from that number.",placeholder:"Your answer…",hint:"Your last answer minus 7"},
-  {id:"s7_3",type:"typed",section:"Attention",prompt:"Take away 7 again. What is the result?",placeholder:"Your answer…",hint:"Your last answer minus 7"},
-  {id:"s7_4",type:"typed",section:"Attention",prompt:"Once more — take away 7.",placeholder:"Your answer…",hint:"Your last answer minus 7"},
-  {id:"s7_5",type:"typed",section:"Attention",prompt:"Last one — take away 7 one final time.",placeholder:"Your answer…",hint:"Your last answer minus 7"},
+const STORIES = [
+  { text:"Maria went to the market on Tuesday morning to buy vegetables. She forgot her shopping list at home, so she only remembered to buy tomatoes and onions. On the way back, she met her neighbour John, who reminded her that she also needed potatoes.",
+    sr_name_q:"What was the woman's name in the story?",
+    sr_day_q:"What day of the week did she go to the market?",
+    sr_forgot_q:"What did she forget to bring from home?",
+    sr_neighbour_q:"Who did she meet on the way back?",
+    intrusion_q:"Did the story say anything about money?" },
+  { text:"James walked to the library on Friday afternoon to return some books. He forgot his library card at home, so the librarian let him off with just a warning. Outside, he met his friend Sarah, who had remembered to bring her card.",
+    sr_name_q:"What was the man's name in the story?",
+    sr_day_q:"What day did he go to the library?",
+    sr_forgot_q:"What did he forget to bring?",
+    sr_neighbour_q:"Who did he meet outside?",
+    intrusion_q:"Did the story mention anything about paying a fine?" },
+  { text:"Priya drove to the hospital on Monday morning for her appointment. She forgot her insurance documents at home, but the receptionist let her fill them in later. In the waiting room, she spoke with her neighbour Raju, who was there for a check-up.",
+    sr_name_q:"What was the woman's name in the story?",
+    sr_day_q:"What day was her appointment?",
+    sr_forgot_q:"What documents did she forget?",
+    sr_neighbour_q:"Who did she meet in the waiting room?",
+    intrusion_q:"Did the story say anything about the woman paying money?" },
+]
 
-  // WORKING MEMORY — Digit Span Backward (distinguishes Alzheimer's from depression)
-  // Alzheimer's: backward much worse than forward. Depression: both equally impaired.
-  // Answers: 2–4 reversed = 42, 5–7–3 reversed = 375, 1–2–4–8 reversed = 8421
-  {id:"dsb_2",type:"digit_span",section:"Attention",
-    prompt:"I will show you some numbers. Type them in REVERSE order — backwards.",
-    subtext:"Example: if you see  3 – 1  →  you type  1 3",
-    digits:"2 – 4",answer:"42",hint:"Say them backwards: 4 first, then 2 → type  4 2"},
-  {id:"dsb_3",type:"digit_span",section:"Attention",
-    prompt:"Good! Now try 3 numbers in reverse order.",
-    digits:"5 – 7 – 3",answer:"375",hint:"Say them backwards: 3 first, then 7, then 5 → type  3 7 5"},
-  {id:"dsb_4",type:"digit_span",section:"Attention",
-    prompt:"Last one — 4 numbers in reverse order.",
-    digits:"1 – 2 – 4 – 8",answer:"8421",hint:"Backwards: 8, then 4, then 2, then 1 → type  8 4 2 1"},
+const LETTER_SETS = [
+  { letter:"F", example:"fish, flower, fast, funny…" },
+  { letter:"S", example:"sun, sleep, slow, start…" },
+  { letter:"A", example:"apple, arm, always, angry…" },
+]
 
-  // LANGUAGE — naming (Boston Naming Test)
-  {id:"name_pencil",type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"✏️",hint:"You hold it and use it to write on paper"},
-  {id:"name_watch", type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"⌚",hint:"You wear it on your wrist — it tells you the time"},
+// ═══ BUILD STEPS — called fresh each test session ══════════════════════════
+function buildSteps() {
+  const wordSet   = WORD_SETS[Math.floor(Math.random()*WORD_SETS.length)]
+  const serial    = SERIAL_STARTS[Math.floor(Math.random()*SERIAL_STARTS.length)]
+  const digits    = DIGIT_SETS[Math.floor(Math.random()*DIGIT_SETS.length)]
+  const story     = STORIES[Math.floor(Math.random()*STORIES.length)]
+  const letterSet = LETTER_SETS[Math.floor(Math.random()*LETTER_SETS.length)]
 
-  // LANGUAGE — 3-step command
-  {id:"command",type:"command",section:"Language",
-    prompt:"Follow these 3 steps in order:",
-    instruction:"Step 1: Close your eyes\nStep 2: Count to 3 silently in your head\nStep 3: Open your eyes and tap the button below"},
+  const steps = [
+    // INTRO
+    {id:"name",  type:"text",   section:"intro", prompt:"What is your full name?",  placeholder:"Type your name here…"},
+    {id:"age",   type:"number", section:"intro", prompt:"How old are you?",          placeholder:"Enter your age…"},
+    {id:"gender",type:"select", section:"intro", prompt:"What is your gender?",      options:["Male","Female","Prefer not to say"]},
 
-  // LANGUAGE — writing
-  {id:"writing",type:"textarea",section:"Language",
-    prompt:"Write one complete sentence about anything.",
-    subtext:"About your day, the weather, your family — anything you like. One sentence is fine.",
-    placeholder:"Write your sentence here…"},
+    // MEMORY — word plant
+    {id:"memory_plant",type:"memory_display",section:"Memory",
+      prompt:"Look at these 3 words carefully.",
+      subtext:"Say each word out loud 2–3 times. You will need to remember them at the very end.",
+      words: wordSet.words},
 
-  // LANGUAGE — Category Fluency (new — temporal lobe, Alzheimer's-specific)
-  {id:"animal_fluency",type:"fluency_animals",section:"Language",
-    prompt:"Name as many animals as you can in 60 seconds.",
-    subtext:"Any animal from anywhere — dogs, birds, fish, wild animals, anything. Type them as fast as you can."},
+    // ORIENTATION
+    {id:"orient_year", type:"typed",section:"Orientation",prompt:"What year is it today?",                  placeholder:"e.g. 2026"},
+    {id:"orient_month",type:"typed",section:"Orientation",prompt:"What month is it right now?",             placeholder:"e.g. March"},
+    {id:"orient_day",  type:"typed",section:"Orientation",prompt:"What day of the week is today?",          placeholder:"e.g. Monday"},
+    {id:"orient_date", type:"typed",section:"Orientation",prompt:"What is today's date — just the number?", placeholder:"e.g. 9"},
+    {id:"orient_place",type:"typed",section:"Orientation",prompt:"What city or town are you in right now?", placeholder:"Type the city name…"},
 
-  // LANGUAGE — Letter Fluency (new — frontal lobe, compares with category)
-  {id:"letter_fluency",type:"fluency_letter",section:"Language",
-    prompt:"Name as many words starting with the letter F as you can — in 60 seconds.",
-    subtext:"Any word that starts with F. Not names of people or places. For example: fish, flower, fast…"},
+    // SERIAL 7s
+    {id:"s7_1",type:"typed",section:"Attention",prompt:`Start with ${serial.start} and take away 7. What do you get?`, placeholder:"Your answer…",hint:`${serial.start} minus 7 = ?`},
+    {id:"s7_2",type:"typed",section:"Attention",prompt:"Now take away 7 from that number.",                            placeholder:"Your answer…",hint:"Your last answer minus 7"},
+    {id:"s7_3",type:"typed",section:"Attention",prompt:"Take away 7 again. What is the result?",                      placeholder:"Your answer…",hint:"Your last answer minus 7"},
+    {id:"s7_4",type:"typed",section:"Attention",prompt:"Once more — take away 7.",                                    placeholder:"Your answer…",hint:"Your last answer minus 7"},
+    {id:"s7_5",type:"typed",section:"Attention",prompt:"Last one — take away 7 one final time.",                      placeholder:"Your answer…",hint:"Your last answer minus 7"},
 
-  // VISUOSPATIAL
-  {id:"clock_draw",type:"clock_draw",section:"Visuospatial",
-    prompt:"Draw a clock showing the time: 10 minutes past 11.",
-    subtext:"Draw a circle. Write all 12 numbers inside it. Draw two hands pointing to 11:10."},
-  {id:"pentagon_draw",type:"pentagon_draw",section:"Visuospatial",
-    prompt:"Copy this shape as carefully as you can.",
-    subtext:"Look at the two five-sided shapes overlapping in the corner. Copy them below."},
+    // DIGIT SPAN BACKWARD
+    {id:"dsb_2",type:"digit_span",section:"Attention",
+      prompt:"I will show you some numbers. Type them in REVERSE order — backwards.",
+      subtext:"Example: if you see  3 – 1  →  you type  1 3",
+      digits:digits.d2.shown, answer:digits.d2.answer, hint:digits.d2.hint},
+    {id:"dsb_3",type:"digit_span",section:"Attention",
+      prompt:"Good! Now try 3 numbers in reverse order.",
+      digits:digits.d3.shown, answer:digits.d3.answer, hint:digits.d3.hint},
+    {id:"dsb_4",type:"digit_span",section:"Attention",
+      prompt:"Last one — 4 numbers in reverse order.",
+      digits:digits.d4.shown, answer:digits.d4.answer, hint:digits.d4.hint},
 
-  // STORY (Logical Memory)
-  {id:"story_read",type:"story_read",section:"Memory",
-    prompt:"Read this short story carefully.",
-    subtext:"Take your time. You will answer questions about it right after.",
-    story:"Maria went to the market on Tuesday morning to buy vegetables. She forgot her shopping list at home, so she only remembered to buy tomatoes and onions. On the way back, she met her neighbour John, who reminded her that she also needed potatoes."},
-  {id:"sr_name",     type:"typed",section:"Memory",prompt:"What was the woman's name in the story?",placeholder:"Your answer…"},
-  {id:"sr_day",      type:"typed",section:"Memory",prompt:"What day of the week did she go to the market?",placeholder:"Your answer…"},
-  {id:"sr_forgot",   type:"typed",section:"Memory",prompt:"What did she forget to bring from home?",placeholder:"Your answer…"},
-  {id:"sr_neighbour",type:"typed",section:"Memory",prompt:"Who did she meet on the way back?",placeholder:"Your answer…"},
+    // LANGUAGE — naming
+    {id:"name_pencil",type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"✏️",hint:"You hold it and use it to write on paper"},
+    {id:"name_watch", type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"⌚",hint:"You wear it on your wrist — it tells you the time"},
 
-  // INTRUSION CHECK (new — confabulation test, Alzheimer's-specific)
-  {id:"intrusion_check",type:"choice",section:"Memory",
-    prompt:"Did the story say anything about money?",
-    subtext:"Think carefully. Re-read the story in your mind.",
-    options:["No, the story did not mention money","Yes, the story mentioned money"]},
+    // LANGUAGE — command, writing
+    {id:"command",type:"command",section:"Language",
+      prompt:"Follow these 3 steps in order:",
+      instruction:"Step 1: Close your eyes\nStep 2: Count to 3 silently in your head\nStep 3: Open your eyes and tap the button below"},
+    {id:"writing",type:"textarea",section:"Language",
+      prompt:"Write one complete sentence about anything.",
+      subtext:"About your day, the weather, your family — anything you like.",
+      placeholder:"Write your sentence here…"},
 
-  // PICTURE — Boston Cookie Theft
-  {id:"picture_describe",type:"picture_describe",section:"Language",
-    prompt:"Look at this kitchen picture. Describe everything you see.",
-    subtext:"Tell us about every person, every action, every object. No wrong answers."},
+    // FLUENCY
+    {id:"animal_fluency",type:"fluency_animals",section:"Language",
+      prompt:"Name as many animals as you can in 60 seconds.",
+      subtext:"Any animal from anywhere — dogs, birds, fish, wild animals, anything. Type them as fast as you can."},
+    {id:"letter_fluency",type:"fluency_letter",section:"Language",
+      prompt:`Name as many words starting with the letter ${letterSet.letter} as you can — in 60 seconds.`,
+      subtext:`Any word that starts with ${letterSet.letter}. Not names of people or places. For example: ${letterSet.example}`,
+      letter:letterSet.letter},
 
-  // SPEECH — DementiaBank protocol
-  {id:"speech_record",type:"speech_record",section:"Speech",
-    prompt:"Read this sentence out loud, then record your voice.",
-    sentence:"The weather was warm and sunny, so the children played happily in the park all afternoon."},
+    // VISUOSPATIAL
+    {id:"clock_draw",   type:"clock_draw",   section:"Visuospatial",
+      prompt:"Draw a clock showing the time: 10 minutes past 11.",
+      subtext:"Draw a circle. Write all 12 numbers inside it. Draw two hands pointing to 11:10."},
+    {id:"pentagon_draw",type:"pentagon_draw",section:"Visuospatial",
+      prompt:"Copy this shape as carefully as you can.",
+      subtext:"Look at the two five-sided shapes overlapping in the corner. Copy them below."},
 
-  // DELAYED WORD RECALL (FCSRT — free recall first)
-  {id:"memory_recall",type:"recall",section:"Memory",
-    prompt:"Earlier we showed you 3 words to remember. What were they?",
-    subtext:"Type as many as you can remember. Do not worry if you forgot some.",
-    placeholder:"e.g. Apple, Table… (separate with commas)"},
+    // STORY
+    {id:"story_read",type:"story_read",section:"Memory",
+      prompt:"Read this short story carefully.",
+      subtext:"Take your time. You will answer questions about it right after.",
+      story:story.text},
+    {id:"sr_name",     type:"typed",section:"Memory",prompt:story.sr_name_q,     placeholder:"Your answer…"},
+    {id:"sr_day",      type:"typed",section:"Memory",prompt:story.sr_day_q,      placeholder:"Your answer…"},
+    {id:"sr_forgot",   type:"typed",section:"Memory",prompt:story.sr_forgot_q,   placeholder:"Your answer…"},
+    {id:"sr_neighbour",type:"typed",section:"Memory",prompt:story.sr_neighbour_q,placeholder:"Your answer…"},
 
-  // CUED RECALL (FCSRT — key Alzheimer's differentiator)
-  {id:"cued_recall",type:"cued_recall",section:"Memory",
-    prompt:"Here are some hints for the 3 words. Can you remember them now?",
-    subtext:"Use the hints below to try and recall the words you could not remember.",
-    cues:["a fruit","a piece of furniture","a coin"]},
+    // INTRUSION CHECK
+    {id:"intrusion_check",type:"choice",section:"Memory",
+      prompt:story.intrusion_q,
+      subtext:"Think carefully. Re-read the story in your mind.",
+      options:["No, the story did not mention money","Yes, the story mentioned money"]},
 
-  // PROSPECTIVE MEMORY (new — frontal + hippocampus)
-  {id:"prospective_memory",type:"choice",section:"Memory",
-    prompt:"At the very beginning of this test, we asked you to remember to do something at the end. Do you remember what it was?",
-    subtext:"We asked you to tell us your city again at the end of the test.",
-    options:["remembered","I do not remember being asked that"]},
+    // ── DISTRACTOR QUESTION (mid-test — standard clinical practice) ──
+    {id:"distractor_q",type:"choice",section:"Attention",
+      prompt:"Quick question before we continue — which of these is a planet in our solar system?",
+      subtext:"This is a short break question. Just pick the right answer.",
+      options:["Mars","Pluto (dwarf planet)","The Moon","The Sun"]},
 
-  // FUNCTIONAL — ADL (new — Alzheimer's specific early marker)
-  {id:"adl_medicine",type:"choice",section:"Function",
-    prompt:"In the last 3 months — have you had difficulty managing your own medicines? (Forgetting to take them, taking wrong doses)",
-    options:["no","yes"]},
-  {id:"adl_money",type:"choice",section:"Function",
-    prompt:"Have you had difficulty handling money or paying bills — things you used to do easily?",
-    options:["no","yes"]},
-  {id:"adl_cooking",type:"choice",section:"Function",
-    prompt:"Have you had difficulty cooking or preparing a meal you have cooked many times before?",
-    options:["no","yes"]},
-  {id:"adl_lostway",type:"choice",section:"Function",
-    prompt:"Have you gotten confused or lost while going somewhere that is very familiar to you?",
-    options:["no","yes"]},
-  {id:"adl_phone",type:"choice",section:"Function",
-    prompt:"Have you had trouble using your mobile phone, TV remote, or other devices you use every day?",
-    options:["no","yes"]},
+    // PICTURE
+    {id:"picture_describe",type:"picture_describe",section:"Language",
+      prompt:"Look at this kitchen picture. Describe everything you see.",
+      subtext:"Tell us about every person, every action, every object. No wrong answers."},
 
-  // HISTORY / RISK FACTORS
-  {id:"family_history",type:"choice",section:"History",
-    prompt:"Do any close family members — parents, brother, or sister — have Alzheimer's or serious memory problems?",
-    options:["No, not that I know of","Yes, a distant relative","Yes, my parent or sibling"]},
-  {id:"memory_complaint",type:"choice",section:"History",
-    prompt:"Have you — or someone close to you — noticed that your memory has been getting worse lately?",
-    options:["No, my memory seems fine","A little bit, maybe","Yes, noticeably worse"]},
-  {id:"depression",type:"choice",section:"History",
-    prompt:"In the last few months, have you felt very sad, empty, or lost interest in things you used to enjoy?",
-    options:["No","Sometimes","Yes, quite often"]},
-  {id:"cardiovascular",type:"choice",section:"History",
-    prompt:"Do you have diabetes (sugar), high blood pressure, or are you overweight?",
-    options:["None of these","One of them","Two or more of these"]},
-  {id:"education",type:"choice",section:"History",
-    prompt:"How many years in total did you spend in school or college?",
-    options:["12 years or more","Between 6 and 12 years","Less than 6 years"]},
-] as any[]
+    // SPEECH
+    {id:"speech_record",type:"speech_record",section:"Speech",
+      prompt:"Read this sentence out loud, then record your voice.",
+      sentence:"The weather was warm and sunny, so the children played happily in the park all afternoon."},
+
+    // DELAYED WORD RECALL
+    {id:"memory_recall",type:"recall",section:"Memory",
+      prompt:"Earlier we showed you 3 words to remember. What were they?",
+      subtext:"Type as many as you can remember. Do not worry if you forgot some.",
+      placeholder:"e.g. Apple, Table… (separate with commas)"},
+
+    // CUED RECALL
+    {id:"cued_recall",type:"cued_recall",section:"Memory",
+      prompt:"Here are some hints for the 3 words. Can you remember them now?",
+      subtext:"Use the hints below to try and recall the words you could not remember.",
+      cues:wordSet.cues},
+
+    // PROSPECTIVE MEMORY
+    {id:"prospective_memory",type:"choice",section:"Memory",
+      prompt:"At the very beginning of this test, we asked you to remember to do something at the end. Do you remember what it was?",
+      subtext:"We asked you to tell us your city again at the end of the test.",
+      options:["remembered","I do not remember being asked that"]},
+
+    // ADL
+    {id:"adl_medicine",type:"choice",section:"Function",prompt:"In the last 3 months — have you had difficulty managing your own medicines?",options:["no","yes"]},
+    {id:"adl_money",   type:"choice",section:"Function",prompt:"Have you had difficulty handling money or paying bills?",               options:["no","yes"]},
+    {id:"adl_cooking", type:"choice",section:"Function",prompt:"Have you had difficulty cooking a meal you have cooked many times before?",options:["no","yes"]},
+    {id:"adl_lostway", type:"choice",section:"Function",prompt:"Have you gotten confused while going somewhere very familiar to you?",    options:["no","yes"]},
+    {id:"adl_phone",   type:"choice",section:"Function",prompt:"Have you had trouble using your mobile phone or TV remote?",             options:["no","yes"]},
+
+    // HISTORY
+    {id:"family_history",  type:"choice",section:"History",prompt:"Do any close family members have Alzheimer's or serious memory problems?",options:["No, not that I know of","Yes, a distant relative","Yes, my parent or sibling"]},
+    {id:"memory_complaint",type:"choice",section:"History",prompt:"Have you noticed your memory getting worse lately?",                     options:["No, my memory seems fine","A little bit, maybe","Yes, noticeably worse"]},
+    {id:"depression",      type:"choice",section:"History",prompt:"In the last few months, have you felt very sad or lost interest in things?",options:["No","Sometimes","Yes, quite often"]},
+    {id:"cardiovascular",  type:"choice",section:"History",prompt:"Do you have diabetes, high blood pressure, or are you overweight?",       options:["None of these","One of them","Two or more of these"]},
+    {id:"education",       type:"choice",section:"History",prompt:"How many years total did you spend in school or college?",                options:["12 years or more","Between 6 and 12 years","Less than 6 years"]},
+  ] as any[]
+
+  const meta = {
+    wordSet,
+    serialAnswers: serial.answers,
+    serialStart: serial.start,
+    digitAnswers: { d2:digits.d2.answer, d3:digits.d3.answer, d4:digits.d4.answer },
+    letterUsed: letterSet.letter,
+  }
+
+  return { steps, meta }
+}
 
 // ═══ DRAWING CANVAS ════════════════════════════════════════════════════════
 function DrawCanvas({onDone,bgFn}:{onDone:()=>void;bgFn?:(ctx:CanvasRenderingContext2D,w:number,h:number)=>void}) {
@@ -244,8 +296,9 @@ function ProgressBar({current,total}:{current:number;total:number}) {
 
 // ═══ STEP COMPONENTS ═══════════════════════════════════════════════════════
 
-function MemoryDisplay({onNext}:any) {
+function MemoryDisplay({step,onNext}:any) {
   const [ready,setReady]=useState(false)
+  const words = step.words || ["Apple","Table","Penny"]
   useEffect(()=>{const t=setTimeout(()=>setReady(true),4000);return()=>clearTimeout(t)},[])
   return (
     <div style={{textAlign:"center"}}>
@@ -253,8 +306,8 @@ function MemoryDisplay({onNext}:any) {
         Say each word out loud — <strong style={{color:"#e5e7eb"}}>two or three times</strong>.<br/>You will need to recall them much later.
       </p>
       <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:28}}>
-        {MEMORY_WORDS.map((w,i)=>(
-          <div key={w} style={{background:"rgba(52,211,153,0.1)",border:"1px solid rgba(52,211,153,0.45)",borderRadius:16,padding:"22px 34px",fontSize:26,fontWeight:700,color:"#6ee7b7",animation:`pop ${0.2+i*0.15}s ease both`}}>{w}</div>
+        {words.map((w:string,i:number)=>(
+          <div key={w} style={{background:"rgba(52,211,153,0.1)",border:"1px solid rgba(52,211,153,0.45)",borderRadius:16,padding:"22px 34px",fontSize:26,fontWeight:700,color:"#6ee7b7"}}>{w}</div>
         ))}
       </div>
       <div style={{background:"rgba(245,158,11,0.07)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:12,padding:"12px 16px",marginBottom:22,display:"inline-block"}}>
@@ -345,7 +398,6 @@ function TextareaStep({step,onNext}:any) {
   )
 }
 
-// NEW: Digit Span Backward
 function DigitSpanStep({step,onNext}:any) {
   const [val,setVal]=useState("")
   const ref=useRef<HTMLInputElement>(null)
@@ -367,7 +419,6 @@ function DigitSpanStep({step,onNext}:any) {
   )
 }
 
-// NEW: Category Fluency — Animals 60s
 function FluencyAnimalsStep({onNext}:any) {
   const [val,setVal]=useState("")
   const [started,setStarted]=useState(false)
@@ -389,22 +440,18 @@ function FluencyAnimalsStep({onNext}:any) {
   useEffect(()=>()=>clearInterval(timerRef.current),[])
 
   const count=val.trim().length===0?0:val.trim().split(/[\n,]+/).map(s=>s.trim()).filter(s=>s.length>0).length
-
-  const submit=()=>{
-    clearInterval(timerRef.current)
-    onNext(String(count))
-  }
+  const submit=()=>{clearInterval(timerRef.current);onNext(String(count))}
 
   return (
     <div>
       <div style={{background:"rgba(236,72,153,0.06)",border:"1px solid rgba(236,72,153,0.2)",borderRadius:14,padding:"16px",marginBottom:18}}>
         <p style={{color:"#f9a8d4",fontSize:13,lineHeight:1.7}}>
-          🐾 Name any animal — dogs, cats, fish, birds, wild animals, insects, anything from anywhere in the world. Type each one on a new line or separate them with commas.
+          🐾 Name any animal — dogs, cats, fish, birds, wild animals, insects, anything. Type each one on a new line or separate with commas.
         </p>
       </div>
       {!started?(
         <div style={{textAlign:"center"}}>
-          <p style={{color:"#9ca3af",fontSize:15,marginBottom:20,lineHeight:1.7}}>You have <strong style={{color:"#f9fafb"}}>60 seconds</strong>. Type as many animals as you can think of. Ready?</p>
+          <p style={{color:"#9ca3af",fontSize:15,marginBottom:20,lineHeight:1.7}}>You have <strong style={{color:"#f9fafb"}}>60 seconds</strong>. Type as many animals as you can. Ready?</p>
           <button className="btn-green" style={{fontSize:17,padding:"14px 36px"}} onClick={start}>▶ Start — 60 seconds</button>
         </div>
       ):(
@@ -413,7 +460,7 @@ function FluencyAnimalsStep({onNext}:any) {
             <span style={{fontFamily:"monospace",fontSize:13,color:"#f9a8d4",fontWeight:700}}>🐾 {count} animals so far</span>
             <span style={{fontFamily:"monospace",fontSize:20,color:timeLeft<=10?"#ef4444":"#34d399",fontWeight:700}}>{timeLeft}s</span>
           </div>
-          <textarea ref={ref} className="inp" rows={6} placeholder="dog, cat, elephant, lion, eagle… type as many as you can!"
+          <textarea ref={ref} className="inp" rows={6} placeholder="dog, cat, elephant, lion, eagle…"
             value={val} onChange={e=>setVal(e.target.value)} style={{resize:"none",minHeight:130,fontSize:15}}
             disabled={finished}/>
           {(finished||timeLeft===0)?(
@@ -432,14 +479,14 @@ function FluencyAnimalsStep({onNext}:any) {
   )
 }
 
-// NEW: Letter Fluency — F words 60s
-function FluencyLetterStep({onNext}:any) {
+function FluencyLetterStep({step,onNext}:any) {
   const [val,setVal]=useState("")
   const [started,setStarted]=useState(false)
   const [timeLeft,setTimeLeft]=useState(60)
   const [finished,setFinished]=useState(false)
   const timerRef=useRef<any>(null)
   const ref=useRef<HTMLTextAreaElement>(null)
+  const letter = (step.letter || "F").toLowerCase()
 
   const start=()=>{
     setStarted(true)
@@ -453,39 +500,35 @@ function FluencyLetterStep({onNext}:any) {
   }
   useEffect(()=>()=>clearInterval(timerRef.current),[])
 
-  const words=val.trim().length===0?[]:val.trim().split(/[\n,\s]+/).map(s=>s.trim().toLowerCase()).filter(s=>s.length>1&&s.startsWith("f"))
+  const words=val.trim().length===0?[]:val.trim().split(/[\n,\s]+/).map(s=>s.trim().toLowerCase()).filter(s=>s.length>1&&s.startsWith(letter))
   const count=words.length
-
-  const submit=()=>{
-    clearInterval(timerRef.current)
-    onNext(String(count))
-  }
+  const submit=()=>{clearInterval(timerRef.current);onNext(String(count))}
 
   return (
     <div>
       <div style={{background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:14,padding:"16px",marginBottom:18}}>
         <p style={{color:"#fcd34d",fontSize:13,lineHeight:1.7}}>
-          🔤 Any word starting with the letter <strong>F</strong>. Not names of people (not "Frank") or places (not "France"). Regular words only — e.g. fish, fast, flower, funny, fall…
+          🔤 Any word starting with the letter <strong>{step.letter||"F"}</strong>. Not names of people or places. For example: {step.subtext?.split("For example: ")[1]||"fish, flower, fast…"}
         </p>
       </div>
       {!started?(
         <div style={{textAlign:"center"}}>
-          <p style={{color:"#9ca3af",fontSize:15,marginBottom:20,lineHeight:1.7}}>You have <strong style={{color:"#f9fafb"}}>60 seconds</strong>. Type as many F-words as you can. Ready?</p>
+          <p style={{color:"#9ca3af",fontSize:15,marginBottom:20,lineHeight:1.7}}>You have <strong style={{color:"#f9fafb"}}>60 seconds</strong>. Ready?</p>
           <button className="btn-green" style={{fontSize:17,padding:"14px 36px"}} onClick={start}>▶ Start — 60 seconds</button>
         </div>
       ):(
         <div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <span style={{fontFamily:"monospace",fontSize:13,color:"#fcd34d",fontWeight:700}}>🔤 {count} F-words so far</span>
+            <span style={{fontFamily:"monospace",fontSize:13,color:"#fcd34d",fontWeight:700}}>🔤 {count} words so far</span>
             <span style={{fontFamily:"monospace",fontSize:20,color:timeLeft<=10?"#ef4444":"#34d399",fontWeight:700}}>{timeLeft}s</span>
           </div>
-          <textarea ref={ref} className="inp" rows={6} placeholder="fish, flower, fast, funny, fall, fire… type as many F-words as you can!"
+          <textarea ref={ref} className="inp" rows={6} placeholder={`Type as many ${step.letter||"F"}-words as you can!`}
             value={val} onChange={e=>setVal(e.target.value)} style={{resize:"none",minHeight:130,fontSize:15}}
             disabled={finished}/>
           {(finished||timeLeft===0)?(
             <div style={{marginTop:14,textAlign:"center"}}>
               <div style={{background:"rgba(52,211,153,0.07)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:12,padding:"14px",marginBottom:14}}>
-                <p style={{color:"#6ee7b7",fontSize:16,fontWeight:600}}>✓ Time is up! You named {count} F-words.</p>
+                <p style={{color:"#6ee7b7",fontSize:16,fontWeight:600}}>✓ Time is up! You named {count} words.</p>
               </div>
               <button className="btn-green" style={{width:"100%",fontSize:17,padding:"15px"}} onClick={submit}>Continue →</button>
             </div>
@@ -498,44 +541,85 @@ function FluencyLetterStep({onNext}:any) {
   )
 }
 
+// ── CLOCK DRAW — AI analyses drawing description ────────────────────────────
 function ClockDrawStep({onNext}:any) {
-  const [phase,setPhase]=useState<"draw"|"rate">("draw")
-  const [score,setScore]=useState<number|null>(null)
+  const [phase,setPhase]=useState<"draw"|"describe"|"analysing"|"done">("draw")
+  const [desc,setDesc]=useState("")
+  const [result,setResult]=useState<{score:number;note:string}|null>(null)
+  const [drawn,setDrawnDone]=useState(false)
+
   const bgFn=(ctx:CanvasRenderingContext2D,w:number,h:number)=>{
     ctx.strokeStyle="rgba(110,231,183,0.12)";ctx.lineWidth=1
     ctx.beginPath();ctx.arc(w/2,h/2,w/2-18,0,Math.PI*2);ctx.stroke()
     ctx.fillStyle="rgba(110,231,183,0.22)";ctx.font="bold 11px monospace";ctx.textAlign="center"
     ctx.fillText("Draw your clock here",w/2,h/2)
   }
-  if(phase==="draw")return(
+
+  const analyse=async()=>{
+    if(!desc.trim())return
+    setPhase("analysing")
+    try{
+      const res=await fetch("/api/analyse-picture",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({description:desc,type:"clock"})})
+      const data=await res.json()
+      setResult(data)
+    }catch{setResult({score:0,note:"Analysis recorded."})}
+    setPhase("done")
+  }
+
+  if(phase==="draw") return(
     <div>
       <div style={{background:"rgba(99,102,241,0.06)",border:"1px solid rgba(99,102,241,0.18)",borderRadius:12,padding:"12px 16px",marginBottom:16}}>
         <p style={{color:"#a5b4fc",fontSize:14,lineHeight:1.7}}>① Draw a circle &nbsp;② Write numbers 1 to 12 inside &nbsp;③ Draw hands at <strong>11:10</strong></p>
       </div>
-      <DrawCanvas bgFn={bgFn} onDone={()=>setPhase("rate")}/>
+      <DrawCanvas bgFn={bgFn} onDone={()=>setPhase("describe")}/>
     </div>
   )
+
+  if(phase==="describe") return(
+    <div>
+      <div style={{background:"rgba(99,102,241,0.07)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:14,padding:16,marginBottom:16}}>
+        <p style={{color:"#a5b4fc",fontSize:14,lineHeight:1.7}}>Now describe your clock drawing. Be honest — this helps the AI score it accurately.</p>
+      </div>
+      <textarea className="inp" rows={4}
+        placeholder="e.g. I drew a circle. I wrote all 12 numbers inside. I drew two hands — one pointing to 11 and one to 2…"
+        value={desc} onChange={e=>setDesc(e.target.value)}
+        style={{resize:"none",minHeight:110,fontSize:15}}/>
+      <button className="btn-green" style={{marginTop:14,width:"100%",fontSize:17,padding:"15px",opacity:desc.trim().length>5?1:0.4}}
+        onClick={analyse} disabled={desc.trim().length<5}>
+        Submit for AI Analysis →
+      </button>
+    </div>
+  )
+
+  if(phase==="analysing") return(
+    <div style={{textAlign:"center",padding:"40px 0"}}>
+      <div className="dots"><span/><span/><span/></div>
+      <p style={{color:"#6b7280",fontSize:14,marginTop:14}}>AI is analysing your clock drawing…</p>
+    </div>
+  )
+
   return(
     <div>
-      <div style={{background:"rgba(99,102,241,0.07)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:14,padding:16,marginBottom:8}}>
-        <p style={{color:"#a5b4fc",fontSize:14}}>Be honest — how close is your clock to the real thing?</p>
+      <div style={{background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:14,padding:"18px",marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <span style={{fontSize:32,fontWeight:700,color:"#34d399",fontFamily:"monospace",flexShrink:0}}>{result?.score}/5</span>
+          <div>
+            <p style={{color:"#6ee7b7",fontSize:14,fontWeight:600,marginBottom:3}}>Clock drawing scored</p>
+            <p style={{color:"#9ca3af",fontSize:13,lineHeight:1.55}}>{result?.note}</p>
+          </div>
+        </div>
       </div>
-      <SelfRate picked={score} onPick={setScore} options={[
-        [5,"Perfect — circle, all 12 numbers, hands clearly at 11:10",5],
-        [4,"Almost perfect — one small mistake",5],
-        [3,"Mostly correct — circle done, most numbers, hands roughly right",5],
-        [2,"Partial — circle drawn but numbers or hands noticeably wrong",5],
-        [1,"Very rough — hard to recognise as a clock",5],
-        [0,"Could not draw it",5],
-      ]}/>
-      {score!==null&&<button className="btn-green" style={{marginTop:16,width:"100%",fontSize:17,padding:"15px"}} onClick={()=>onNext(String(score))}>Next →</button>}
+      <button className="btn-green" style={{width:"100%",fontSize:17,padding:"15px"}} onClick={()=>onNext(String(result?.score??0))}>Continue →</button>
     </div>
   )
 }
 
+// ── PENTAGON DRAW — AI analyses drawing description ─────────────────────────
 function PentagonDrawStep({onNext}:any) {
-  const [phase,setPhase]=useState<"draw"|"rate">("draw")
-  const [score,setScore]=useState<number|null>(null)
+  const [phase,setPhase]=useState<"draw"|"describe"|"analysing"|"done">("draw")
+  const [desc,setDesc]=useState("")
+  const [result,setResult]=useState<{score:number;note:string}|null>(null)
+
   const bgFn=(ctx:CanvasRenderingContext2D,w:number,h:number)=>{
     const drawP=(cx:number,cy:number,r:number)=>{
       ctx.beginPath()
@@ -546,23 +630,60 @@ function PentagonDrawStep({onNext}:any) {
     ctx.fillStyle="rgba(165,180,252,0.35)";ctx.font="bold 10px monospace";ctx.textAlign="center"
     ctx.fillText("↗ COPY THESE SHAPES BELOW",w/2,h-12)
   }
-  if(phase==="draw")return(
+
+  const analyse=async()=>{
+    if(!desc.trim())return
+    setPhase("analysing")
+    try{
+      const res=await fetch("/api/analyse-picture",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({description:desc,type:"pentagon"})})
+      const data=await res.json()
+      setResult(data)
+    }catch{setResult({score:0,note:"Analysis recorded."})}
+    setPhase("done")
+  }
+
+  if(phase==="draw") return(
     <div>
-      <p style={{color:"#9ca3af",fontSize:14,marginBottom:14,lineHeight:1.75}}>Look at the two five-sided shapes in the <strong style={{color:"#a5b4fc"}}>top-right corner</strong>. They overlap. Copy them below — try to make them look the same.</p>
-      <DrawCanvas bgFn={bgFn} onDone={()=>setPhase("rate")}/>
+      <p style={{color:"#9ca3af",fontSize:14,marginBottom:14,lineHeight:1.75}}>Look at the two five-sided shapes in the <strong style={{color:"#a5b4fc"}}>top-right corner</strong>. They overlap. Copy them below.</p>
+      <DrawCanvas bgFn={bgFn} onDone={()=>setPhase("describe")}/>
     </div>
   )
+
+  if(phase==="describe") return(
+    <div>
+      <div style={{background:"rgba(99,102,241,0.07)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:14,padding:16,marginBottom:16}}>
+        <p style={{color:"#a5b4fc",fontSize:14,lineHeight:1.7}}>Describe your drawing. Did the shapes overlap? Did they have 5 sides each?</p>
+      </div>
+      <textarea className="inp" rows={3}
+        placeholder="e.g. I drew two five-sided shapes and they overlap in the middle…"
+        value={desc} onChange={e=>setDesc(e.target.value)}
+        style={{resize:"none",minHeight:90,fontSize:15}}/>
+      <button className="btn-green" style={{marginTop:14,width:"100%",fontSize:17,padding:"15px",opacity:desc.trim().length>5?1:0.4}}
+        onClick={analyse} disabled={desc.trim().length<5}>
+        Submit for AI Analysis →
+      </button>
+    </div>
+  )
+
+  if(phase==="analysing") return(
+    <div style={{textAlign:"center",padding:"40px 0"}}>
+      <div className="dots"><span/><span/><span/></div>
+      <p style={{color:"#6b7280",fontSize:14,marginTop:14}}>AI is analysing your pentagon drawing…</p>
+    </div>
+  )
+
   return(
     <div>
-      <div style={{background:"rgba(99,102,241,0.07)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:14,padding:16,marginBottom:8}}>
-        <p style={{color:"#a5b4fc",fontSize:14}}>How well did you copy the two shapes?</p>
+      <div style={{background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.25)",borderRadius:14,padding:"18px",marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"center",gap:14}}>
+          <span style={{fontSize:32,fontWeight:700,color:"#34d399",fontFamily:"monospace",flexShrink:0}}>{result?.score}/2</span>
+          <div>
+            <p style={{color:"#6ee7b7",fontSize:14,fontWeight:600,marginBottom:3}}>Pentagon drawing scored</p>
+            <p style={{color:"#9ca3af",fontSize:13,lineHeight:1.55}}>{result?.note}</p>
+          </div>
+        </div>
       </div>
-      <SelfRate picked={score} onPick={setScore} options={[
-        [2,"Both shapes have 5 sides and they overlap — looks like the original",2],
-        [1,"Roughly similar — two shapes visible, mostly 5 sides",2],
-        [0,"Very different from the original, or could not draw it",2],
-      ]}/>
-      {score!==null&&<button className="btn-green" style={{marginTop:16,width:"100%",fontSize:17,padding:"15px"}} onClick={()=>onNext(String(score))}>Next →</button>}
+      <button className="btn-green" style={{width:"100%",fontSize:17,padding:"15px"}} onClick={()=>onNext(String(result?.score??0))}>Continue →</button>
     </div>
   )
 }
@@ -591,10 +712,10 @@ function PictureDescribeStep({onNext}:any) {
     if(val.trim().length<5)return
     setLoading(true)
     try{
-      const res=await fetch("/api/analyse-picture",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({description:val})})
+      const res=await fetch("/api/analyse-picture",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({description:val,type:"picture"})})
       const data=await res.json()
       setResult(data)
-    }catch{setResult({score:3,note:"Description recorded."})}
+    }catch{setResult({score:0,note:"Description recorded."})}
     setLoading(false)
   }
 
@@ -618,7 +739,7 @@ function PictureDescribeStep({onNext}:any) {
       {!result?(
         <button className="btn-green" style={{marginTop:14,width:"100%",fontSize:17,padding:"15px",opacity:val.trim().length>5?1:0.4}}
           onClick={analyse} disabled={loading||val.trim().length<5}>
-          {loading?"Analysing your description…":"Submit →"}
+          {loading?"AI is analysing your description…":"Submit →"}
         </button>
       ):(
         <div style={{marginTop:14,display:"flex",alignItems:"center",gap:12,background:"rgba(52,211,153,0.06)",border:"1px solid rgba(52,211,153,0.2)",borderRadius:12,padding:"14px 16px"}}>
@@ -631,9 +752,7 @@ function PictureDescribeStep({onNext}:any) {
   )
 }
 
-// ═══ SPEECH — completely rebuilt, zero repeat bug ═══════════════════════════
-// Root cause: continuous=true fires onresult repeatedly for same audio.
-// Fix: continuous=false + interimResults=false + fresh instance each attempt.
+// ═══ SPEECH — rebuilt, zero repeat bug ══════════════════════════════════════
 function SpeechRecordStep({step,onNext}:any) {
   const [phase,setPhase]=useState<"ready"|"recording"|"done"|"analysing"|"complete">("ready")
   const [transcript,setTranscript]=useState("")
@@ -666,50 +785,31 @@ function SpeechRecordStep({step,onNext}:any) {
     stoppingRef.current=false
     collectedRef.current=[]
     setTranscript("");setSeconds(0);setAttempts(a=>a+1)
-
     const recog=new SR()
-    recog.continuous=false       // FIXES repeat bug — one utterance per session
-    recog.interimResults=false   // FIXES duplicate bug — only fire on final result
+    recog.continuous=false
+    recog.interimResults=false
     recog.lang="en-US"
     recog.maxAlternatives=1
-
     recog.onresult=(e:any)=>{
       for(let i=e.resultIndex;i<e.results.length;i++){
-        if(e.results[i].isFinal){
-          collectedRef.current.push(e.results[i][0].transcript.trim())
-        }
+        if(e.results[i].isFinal){collectedRef.current.push(e.results[i][0].transcript.trim())}
       }
       setTranscript(collectedRef.current.join(" "))
     }
-    recog.onerror=(e:any)=>{
-      clearInterval(timerRef.current)
-      if(e.error!=="aborted")setPhase("done")
-    }
-    recog.onend=()=>{
-      clearInterval(timerRef.current)
-      if(!stoppingRef.current){setTranscript(collectedRef.current.join(" "));setPhase("done")}
-    }
-
+    recog.onerror=(e:any)=>{clearInterval(timerRef.current);if(e.error!=="aborted")setPhase("done")}
+    recog.onend=()=>{clearInterval(timerRef.current);if(!stoppingRef.current){setTranscript(collectedRef.current.join(" "));setPhase("done")}}
     recogRef.current=recog
     recog.start()
     setPhase("recording")
-
     timerRef.current=setInterval(()=>{
       setSeconds(s=>{
-        if(s>=22){
-          stoppingRef.current=true;cleanup()
-          setTranscript(collectedRef.current.join(" "));setPhase("done")
-          return s
-        }
+        if(s>=22){stoppingRef.current=true;cleanup();setTranscript(collectedRef.current.join(" "));setPhase("done");return s}
         return s+1
       })
     },1000)
   }
 
-  const stopRec=()=>{
-    stoppingRef.current=true;cleanup()
-    setTranscript(collectedRef.current.join(" "));setPhase("done")
-  }
+  const stopRec=()=>{stoppingRef.current=true;cleanup();setTranscript(collectedRef.current.join(" "));setPhase("done")}
 
   const analyse=async(text:string)=>{
     setPhase("analysing")
@@ -717,7 +817,7 @@ function SpeechRecordStep({step,onNext}:any) {
       const res=await fetch("/api/analyse-speech",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({transcript:text,sentence:step.sentence})})
       const data=await res.json()
       setScore(data.score);setFeedback(data.note)
-    }catch{setScore(3);setFeedback("Speech recorded.")}
+    }catch{setScore(0);setFeedback("Speech recorded.")}
     setPhase("complete")
   }
 
@@ -750,7 +850,6 @@ function SpeechRecordStep({step,onNext}:any) {
 
       {phase==="recording"&&(
         <div style={{textAlign:"center"}}>
-          <div className="rec-ring"><div style={{width:28,height:28,borderRadius:"50%",background:"#ef4444"}}/></div>
           <p style={{color:"#ef4444",fontFamily:"monospace",fontSize:16,marginBottom:6,fontWeight:700}}>🔴 RECORDING — {seconds}s / 22s</p>
           <p style={{color:"#6b7280",fontSize:13,marginBottom:20}}>Speak clearly and naturally</p>
           {transcript&&(
@@ -835,7 +934,6 @@ function RecallStep({step,onNext}:any) {
   )
 }
 
-// NEW: Cued Recall — FCSRT key test
 function CuedRecallStep({step,onNext}:any) {
   const [vals,setVals]=useState(["","",""])
   const updateVal=(i:number,v:string)=>setVals(prev=>{const n=[...prev];n[i]=v;return n})
@@ -890,21 +988,21 @@ export default function Home() {
   const [aiText,setAiText]=useState("")
   const [aiLoading,setAiLoading]=useState(false)
   const [saving,setSaving]=useState(false)
+  const [session,setSession]=useState(()=>buildSteps())
 
-  const total=ALL_STEPS.length
-  const step=ALL_STEPS[stepIdx]||null
+  const total=session.steps.length
+  const step=session.steps[stepIdx]||null
   const isResults=stepIdx>=total
 
   const saveAndNext=async(value:string)=>{
     if(!step)return
-    const next:Record<string,any>={...answers,[step.id]:value}
-    // store fluency counts separately for scoring
-    if(step.type==="fluency_animals"){
-      next["animal_fluency_count"]=value
-    }
-    if(step.type==="fluency_letter"){
-      next["letter_fluency_count"]=value
-    }
+    const next={...answers,[step.id]:value}
+    if(step.type==="fluency_animals") next["animal_fluency_count"]=value
+    if(step.type==="fluency_letter")  next["letter_fluency_count"]=value
+    // Store session meta so scoring uses the right answers
+    next["_serial_answers"] = JSON.stringify(session.meta.serialAnswers)
+    next["_digit_answers"]  = JSON.stringify(session.meta.digitAnswers)
+    next["_word_set"]       = JSON.stringify(session.meta.wordSet.words)
     setAnswers(next)
     if(stepIdx+1>=total){await finish(next)}
     else{setStepIdx(i=>i+1)}
@@ -929,17 +1027,25 @@ export default function Home() {
     setAiLoading(false);setSaving(false)
   }
 
-  const restart=()=>{setStepIdx(-1);setAnswers({});setResults(null);setAiText("");setAiLoading(false)}
+  const restart=()=>{
+    setStepIdx(-1)
+    setAnswers({})
+    setResults(null)
+    setAiText("")
+    setAiLoading(false)
+    setSession(buildSteps())
+  }
 
   const brainScores=results&&answers?(()=>{
+    const wordSet = session.meta.wordSet.words.map((w:string)=>w.toLowerCase())
     const recalled=(answers.memory_recall||"").toLowerCase()
-    const memFree=['apple','table','penny'].filter(w=>recalled.includes(w)).length
-    const memCued=['apple','table','penny'].filter(w=>(answers.cued_recall||"").toLowerCase().includes(w)).length
+    const memFree=wordSet.filter((w:string)=>recalled.includes(w)).length
+    const memCued=wordSet.filter((w:string)=>(answers.cued_recall||"").toLowerCase().includes(w)).length
     const memStory=[
-      (answers.sr_name||"").toLowerCase().includes("maria"),
-      (answers.sr_day||"").toLowerCase().includes("tuesday"),
-      !!(answers.sr_forgot||"").toLowerCase().match(/list|shopping/),
-      (answers.sr_neighbour||"").toLowerCase().includes("john"),
+      !!(answers.sr_name||"").toLowerCase().match(/maria|james|priya/),
+      !!(answers.sr_day||"").toLowerCase().match(/tuesday|friday|monday/),
+      !!(answers.sr_forgot||"").toLowerCase().match(/list|shopping|card|library|document|insurance/),
+      !!(answers.sr_neighbour||"").toLowerCase().match(/john|sarah|raju/),
     ].filter(Boolean).length
     const memTotal=memFree+memCued+memStory
     const now=new Date()
@@ -950,13 +1056,13 @@ export default function Home() {
       (answers.orient_date||"").trim()===String(now.getDate()),
       (answers.orient_place||"").trim().length>1,
     ].filter(Boolean).length
-    const attPts=[93,86,79,72,65].filter((v,i)=>parseInt([answers.s7_1,answers.s7_2,answers.s7_3,answers.s7_4,answers.s7_5][i])===v).length
-    const dsbPts=[(answers.dsb_2||"").replace(/[\s\-,.]/g,""),"42",(answers.dsb_3||"").replace(/[\s\-,.]/g,""),"375",(answers.dsb_4||"").replace(/[\s\-,.]/g,""),"8241"].reduce((acc,v,i)=>i%2===0?acc:(acc+(parseInt(String(acc))===parseInt(v)?0:0)),0)
-    const dsbScore=((answers.dsb_2||"").replace(/[\s\-,.]/g,"")===String("42")?1:0)+((answers.dsb_3||"").replace(/[\s\-,.]/g,"")===String("375")?1:0)+((answers.dsb_4||"").replace(/[\s\-,.]/g,"")===String("8421")?1:0)
+    const serialCorrect: number[] = session.meta.serialAnswers
+    const attPts=serialCorrect.filter((v:number,i:number)=>parseInt([answers.s7_1,answers.s7_2,answers.s7_3,answers.s7_4,answers.s7_5][i])===v).length
+    const digitCorrect = session.meta.digitAnswers
+    const dsbScore=((answers.dsb_2||"").replace(/[\s\-,.]/g,"")=== digitCorrect.d2?1:0)+((answers.dsb_3||"").replace(/[\s\-,.]/g,"")=== digitCorrect.d3?1:0)+((answers.dsb_4||"").replace(/[\s\-,.]/g,"")=== digitCorrect.d4?1:0)
     const langPts=((answers.name_pencil||"").toLowerCase().includes("pencil")?1:0)+(!!(answers.name_watch||"").toLowerCase().match(/watch|clock/)?1:0)+(answers.command==="done"?1:0)+((answers.writing||"").trim().split(/\s+/).length>=3?1:0)
     const visPts=parseInt(answers.clock_score||"0")+parseInt(answers.pentagon_score||"0")
-    const fluPts=parseInt(answers.animal_fluency_count||"0")>=14?5:parseInt(answers.animal_fluency_count||"0")>=10?4:parseInt(answers.animal_fluency_count||"0")>=7?3:2
-    return{memTotal,oriPts,attPts,dsbScore,langPts,visPts,fluPts,spkPts:parseInt(answers.speech_record||"0")}
+    return{memTotal,oriPts,attPts,dsbScore,langPts,visPts,spkPts:parseInt(answers.speech_record||"0")}
   })():null
 
   const renderStep=()=>{
@@ -1013,7 +1119,7 @@ export default function Home() {
                   ["📍","Answer easy questions","Date, day, city"],
                   ["🔢","Reverse some numbers","Tests working memory"],
                   ["🐾","Name animals in 60 seconds","Simple and quick"],
-                  ["🕐","Draw a clock","No art skills needed"],
+                  ["🕐","Draw a clock","AI analyses your drawing"],
                   ["📖","Read and remember a story","4 simple questions after"],
                   ["🎙️","Read one sentence aloud","AI checks your speech"],
                   ["🤖","Get your brain report","AI explains what each result means — in plain words"],
@@ -1061,10 +1167,9 @@ export default function Home() {
                 <p style={{fontSize:15,color:results.color,lineHeight:1.8,maxWidth:380,margin:"0 auto"}}>{results.rec}</p>
               </div>
 
-              {/* Pattern insight card */}
               {results.pattern==="MOOD_RELATED"&&(
                 <div style={{background:"rgba(99,102,241,0.07)",border:"1px solid rgba(99,102,241,0.25)",borderRadius:14,padding:"14px 16px",marginBottom:14}}>
-                  <p style={{color:"#a5b4fc",fontSize:13,lineHeight:1.7}}>💡 <strong>Pattern note:</strong> Memory improved with cues — this suggests a retrieval issue, not storage damage. This pattern is often related to mood rather than Alzheimer's.</p>
+                  <p style={{color:"#a5b4fc",fontSize:13,lineHeight:1.7}}>💡 <strong>Pattern note:</strong> Memory improved with cues — this suggests a retrieval issue, not storage damage. This pattern is often related to mood rather than Alzheimer&apos;s.</p>
                 </div>
               )}
               {results.pattern==="ALZHEIMERS_PATTERN"&&(
@@ -1073,7 +1178,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Brain Map */}
               {brainScores&&(
                 <div style={{marginBottom:16}}>
                   <p style={{fontFamily:"monospace",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",color:"#6b7280",marginBottom:10}}>🧠 BRAIN REGION ANALYSIS</p>
@@ -1088,7 +1192,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Score grid */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:9,marginBottom:16}}>
                 {[
                   ["MMSE",`${results.mmse}/30`,results.mmse>=24?"Normal":results.mmse>=18?"Mild":"Low"],
@@ -1104,14 +1207,12 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Patient */}
               <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"13px 16px",marginBottom:16}}>
                 <div style={{fontFamily:"monospace",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",color:"#6b7280",marginBottom:5}}>PATIENT</div>
                 <div style={{fontSize:17,color:"#f9fafb"}}>{answers.name||"—"}</div>
                 <div style={{fontSize:12,color:"#6b7280",marginTop:3}}>Age {answers.age} · {answers.gender}</div>
               </div>
 
-              {/* AI Report */}
               <div style={{background:"rgba(99,102,241,0.05)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:18,padding:"22px",marginBottom:16}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
                   <span style={{fontSize:20}}>🧠</span>

@@ -16,71 +16,86 @@ export function computeScore(ans: Record<string,string>) {
   let pts = 0, max = 0
   const check = (cond:boolean) => { max++; if(cond) pts++ }
 
-  // 1. ORIENTATION 5pts — Hippocampus + Parietal
+  // 1. ORIENTATION 5pts
   check(ans.orient_year?.trim().toLowerCase()  === now.year)
   check(ans.orient_month?.trim().toLowerCase() === now.month)
   check(ans.orient_day?.trim().toLowerCase()   === now.day)
   check(ans.orient_date?.trim()                === now.date)
   check((ans.orient_place||"").trim().length > 1)
 
-  // 2. SERIAL 7s 5pts — Prefrontal Cortex
-  ;([[93,"s7_1"],[86,"s7_2"],[79,"s7_3"],[72,"s7_4"],[65,"s7_5"]] as [number,string][])
-    .forEach(([v,k])=>check(parseInt(ans[k])===v))
+  // 2. SERIAL 7s 5pts — reads correct answers from session (rotating questions)
+  const serialCorrect: number[] = ans._serial_answers
+    ? JSON.parse(ans._serial_answers)
+    : [93,86,79,72,65]
+  ;(["s7_1","s7_2","s7_3","s7_4","s7_5"] as string[])
+    .forEach((k,i)=>check(parseInt(ans[k])===serialCorrect[i]))
 
-  // 3. DIGIT SPAN BACKWARD 3pts — Prefrontal (Alzheimer's fails backward MORE than forward)
-  check((ans.dsb_2||"").replace(/[\s\-,.]/g,"") === "42")
-  check((ans.dsb_3||"").replace(/[\s\-,.]/g,"") === "375")
-  check((ans.dsb_4||"").replace(/[\s\-,.]/g,"") === "8421")
+  // 3. DIGIT SPAN BACKWARD 3pts
+  const digitCorrect = ans._digit_answers
+    ? JSON.parse(ans._digit_answers)
+    : { d2:"42", d3:"375", d4:"8421" }
+  check((ans.dsb_2||"").replace(/[\s\-,.]/g,"") === digitCorrect.d2)
+  check((ans.dsb_3||"").replace(/[\s\-,.]/g,"") === digitCorrect.d3)
+  check((ans.dsb_4||"").replace(/[\s\-,.]/g,"") === digitCorrect.d4)
 
-  // 4. NAMING 2pts — Left Temporal (Wernicke's Area)
+  // 4. NAMING 2pts
   check((ans.name_pencil||"").toLowerCase().includes("pencil"))
   check(!!(ans.name_watch||"").toLowerCase().match(/watch|clock/))
 
-  // 5. COMMAND 1pt — Frontal Lobe
+  // 5. COMMAND 1pt
   check(ans.command==="done")
 
-  // 6. WRITING 1pt — Frontal + Language
+  // 6. WRITING 1pt
   check((ans.writing||"").trim().split(/\s+/).length>=3)
 
-  // 7. FREE RECALL 3pts — Hippocampus (FCSRT)
+  // 7. FREE RECALL 3pts
+  const activeWords: string[] = ans._word_set
+    ? JSON.parse(ans._word_set)
+    : MEMORY_WORDS
   const recalled = (ans.memory_recall||"").toLowerCase()
-  const freeHit = MEMORY_WORDS.filter(w=>recalled.includes(w.toLowerCase()))
+  const freeHit = activeWords.filter(w=>recalled.includes(w.toLowerCase()))
   pts += freeHit.length; max += 3
 
-  // 8. CUED RECALL 3pts — FCSRT (THE key Alzheimer's differentiator)
+  // 8. CUED RECALL 3pts
   const cueText = (ans.cued_recall||"").toLowerCase()
-  const cuedHit = MEMORY_WORDS.filter(w=>cueText.includes(w.toLowerCase()))
+  const cuedHit = activeWords.filter(w=>cueText.includes(w.toLowerCase()))
   pts += cuedHit.length; max += 3
 
-  // 9. STORY RECALL 4pts — Hippocampus + Temporal
-  check((ans.sr_name||"").toLowerCase().includes("maria"))
-  check((ans.sr_day||"").toLowerCase().includes("tuesday"))
-  check(!!(ans.sr_forgot||"").toLowerCase().match(/list|shopping/))
-  check((ans.sr_neighbour||"").toLowerCase().includes("john"))
+  // 9. STORY RECALL 4pts
+  check((ans.sr_name||"").toLowerCase().includes("maria") ||
+        (ans.sr_name||"").toLowerCase().includes("james") ||
+        (ans.sr_name||"").toLowerCase().includes("priya"))
+  check((ans.sr_day||"").toLowerCase().includes("tuesday") ||
+        (ans.sr_day||"").toLowerCase().includes("friday") ||
+        (ans.sr_day||"").toLowerCase().includes("monday"))
+  check(!!(ans.sr_forgot||"").toLowerCase().match(/list|shopping|card|library|document|insurance|paper/))
+  check((ans.sr_neighbour||"").toLowerCase().includes("john") ||
+        (ans.sr_neighbour||"").toLowerCase().includes("sarah") ||
+        (ans.sr_neighbour||"").toLowerCase().includes("raju"))
 
-  // 10. INTRUSION CHECK 1pt — Confabulation (Alzheimer's-specific)
+  // 10. INTRUSION CHECK 1pt
   const noIntrusion = (ans.intrusion_check||"") === "No, the story did not mention money"
   check(noIntrusion)
 
-  // 11. PROSPECTIVE MEMORY 1pt — Frontal + Hippocampus
+  // 11. PROSPECTIVE MEMORY 1pt
   check(ans.prospective_memory==="remembered")
 
-  // 12. CATEGORY FLUENCY 0-5pts — Temporal Lobe (Semantic Memory)
+  // 12. CATEGORY FLUENCY 0-5pts
   const animals = parseInt(ans.animal_fluency_count||"0")
   const aScore  = animals>=18?5:animals>=14?4:animals>=10?3:animals>=7?2:animals>=4?1:0
   pts += aScore; max += 5
 
-  // 13. LETTER FLUENCY 0-4pts — Frontal Lobe
+  // 13. LETTER FLUENCY 0-4pts
   const fwords  = parseInt(ans.letter_fluency_count||"0")
   const fScore  = fwords>=15?4:fwords>=10?3:fwords>=7?2:fwords>=4?1:0
   pts += fScore; max += 4
 
-  // 14. VISUOSPATIAL 7pts — Parietal Lobe
+  // 14. VISUOSPATIAL 7pts
   const clockPts = Math.min(parseInt(ans.clock_score||"0"),5); pts += clockPts; max += 5
   const pentPts  = Math.min(parseInt(ans.pentagon_score||"0"),2); pts += pentPts; max += 2
 
-  // 15. SPEECH 5pts — Broca's Area
-  const speechPts = Math.min(parseInt(ans.speech_record||"3"),5); pts += speechPts; max += 5
+  // 15. SPEECH 5pts — default 0 (not 3, so blank = no free points)
+  const speechPts = Math.min(parseInt(ans.speech_record||"0"),5); pts += speechPts; max += 5
 
   const mmse = Math.round((pts/max)*30)
 
@@ -104,8 +119,8 @@ export function computeScore(ans: Record<string,string>) {
   risk += adlFails
 
   // PATTERN ANALYSIS
-  const freeWordsHit    = freeHit.length
-  const cuedWordsHit    = cuedHit.length
+  const freeWordsHit     = freeHit.length
+  const cuedWordsHit     = cuedHit.length
   const cuedHelpedMemory = freeWordsHit<=1 && cuedWordsHit>=2
   const bothRecallFailed = freeWordsHit<=1 && cuedWordsHit<=1
   const fluencyAlzFlag   = animals<fwords && animals<12
@@ -114,10 +129,16 @@ export function computeScore(ans: Record<string,string>) {
   const adlImpaired      = adlFails>=2
   const confabulation    = !noIntrusion
 
-  const cogPenalty    = mmse<24 ? (24-mmse)*0.5 : 0
-  const cuedProtect   = cuedHelpedMemory ? -2 : 0
-  const alzBoost      = (bothRecallFailed?1.5:0)+(fluencyAlzFlag?1.5:0)+(confabulation?1.0:0)+(clockSevere&&adlImpaired?1.0:0)
-  const total         = Math.max(0, risk+cogPenalty+alzBoost+cuedProtect)
+  const cogPenalty  = mmse<24 ? (24-mmse)*0.5 : 0
+  const cuedProtect = cuedHelpedMemory ? -2 : 0
+  const alzBoost    = (bothRecallFailed?1.5:0)+(fluencyAlzFlag?1.5:0)+(confabulation?1.0:0)+(clockSevere&&adlImpaired?1.0:0)
+  const baseTotal   = Math.max(0, risk+cogPenalty+alzBoost+cuedProtect)
+
+  // STRICTER THRESHOLDS — poor test scores now push toward HIGH
+  const mmseRiskBoost   = mmse < 20 ? 4 : mmse < 24 ? 2 : 0
+  const clockRiskBoost  = clockPts <= 1 ? 3 : clockPts <= 2 ? 1.5 : 0
+  const recallRiskBoost = bothRecallFailed ? 2 : 0
+  const total = Math.max(0, baseTotal + mmseRiskBoost + clockRiskBoost + recallRiskBoost)
 
   let pattern = "GENERAL_CONCERN"
   if(cuedHelpedMemory && depressionHigh) pattern="MOOD_RELATED"
@@ -127,10 +148,10 @@ export function computeScore(ans: Record<string,string>) {
   else if(adlImpaired)                   pattern="EARLY_DECLINE"
 
   let level:"LOW"|"MODERATE"|"HIGH", color:string, emoji:string, rec:string
-  if(total<=4){
+  if(total<=3){
     level="LOW"; color="#10b981"; emoji="✅"
     rec="No significant concerns found. Your brain health looks good. Recheck in 12 months."
-  } else if(total<=9){
+  } else if(total<=7){
     level="MODERATE"; color="#f59e0b"; emoji="⚠️"
     rec="Some thinking patterns are worth discussing with a doctor. This is not a diagnosis — a professional should take a closer look."
   } else {
