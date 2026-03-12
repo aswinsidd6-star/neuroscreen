@@ -6,26 +6,35 @@ import { computeScore, SECTION_STYLE } from "../lib/scoring"
 // ═══ QUESTION POOLS — randomly selected each session ══════════════════════
 const WORD_SETS = [
   { words: ["Apple","Table","Penny"],   cues: ["a fruit","a piece of furniture","a coin"] },
+  { words: ["River","Chair","Coin"],    cues: ["it flows with water","you sit on it","a type of money"] },
+  { words: ["Flower","Book","Dollar"],  cues: ["a plant that blooms","you read it","a unit of money"] },
+  { words: ["Orange","Lamp","Button"],  cues: ["a round orange fruit","it gives light","you press or sew it"] },
   { words: ["Candle","River","Doctor"], cues: ["you light it","it flows with water","a medical person"] },
   { words: ["Tiger","Chair","Bread"],   cues: ["a wild animal","you sit on it","a food you eat"] },
 ]
 
 const SERIAL_STARTS = [
-  { start: 100, answers: [93,86,79,72,65] },
-  { start: 98,  answers: [91,84,77,70,63] },
-  { start: 95,  answers: [88,81,74,67,60] },
+  { start: 100, step: 7, answers: [93,86,79,72,65] },
+  { start: 98,  step: 7, answers: [91,84,77,70,63] },
+  { start: 95,  step: 7, answers: [88,81,74,67,60] },
+  { start: 90,  step: 6, answers: [84,78,72,66,60] },
+  { start: 80,  step: 5, answers: [75,70,65,60,55] },
+  { start: 70,  step: 4, answers: [66,62,58,54,50] },
 ]
 
 const DIGIT_SETS = [
-  { d2:{shown:"2 – 4",      answer:"42",   hint:"4 first, then 2"},
-    d3:{shown:"5 – 7 – 3",  answer:"375",  hint:"3, then 7, then 5"},
-    d4:{shown:"1 – 2 – 4 – 8",answer:"8421",hint:"8, 4, 2, 1"} },
-  { d2:{shown:"7 – 3",      answer:"37",   hint:"3 first, then 7"},
-    d3:{shown:"4 – 9 – 2",  answer:"294",  hint:"2, then 9, then 4"},
-    d4:{shown:"3 – 6 – 1 – 8",answer:"8163",hint:"8, 1, 6, 3"} },
-  { d2:{shown:"9 – 1",      answer:"19",   hint:"1 first, then 9"},
-    d3:{shown:"6 – 2 – 8",  answer:"826",  hint:"8, then 2, then 6"},
-    d4:{shown:"5 – 1 – 7 – 4",answer:"4715",hint:"4, 7, 1, 5"} },
+  { d2:{shown:"2 – 4",        answer:"42",    hint:"4 first, then 2"},
+    d3:{shown:"5 – 7 – 3",    answer:"375",   hint:"3, then 7, then 5"},
+    d4:{shown:"1 – 2 – 4 – 8",answer:"8421",  hint:"8, 4, 2, 1"},
+    d5:{shown:"3 – 9 – 4 – 2 – 7",answer:"72493",hint:"7, 2, 4, 9, 3"} },
+  { d2:{shown:"7 – 3",        answer:"37",    hint:"3 first, then 7"},
+    d3:{shown:"4 – 9 – 2",    answer:"294",   hint:"2, then 9, then 4"},
+    d4:{shown:"3 – 6 – 1 – 8",answer:"8163",  hint:"8, 1, 6, 3"},
+    d5:{shown:"6 – 1 – 8 – 3 – 5",answer:"53816",hint:"5, 3, 8, 1, 6"} },
+  { d2:{shown:"9 – 1",        answer:"19",    hint:"1 first, then 9"},
+    d3:{shown:"6 – 2 – 8",    answer:"826",   hint:"8, then 2, then 6"},
+    d4:{shown:"5 – 1 – 7 – 4",answer:"4715",  hint:"4, 7, 1, 5"},
+    d5:{shown:"2 – 8 – 5 – 1 – 9",answer:"91582",hint:"9, 1, 5, 8, 2"} },
 ]
 
 const STORIES = [
@@ -69,6 +78,11 @@ function buildSteps() {
     {id:"age",   type:"number", section:"intro", prompt:"How old are you?",          placeholder:"Enter your age…"},
     {id:"gender",type:"select", section:"intro", prompt:"What is your gender?",      options:["Male","Female","Prefer not to say"]},
 
+    // PROSPECTIVE MEMORY INSTRUCTION — planted at the start, tested at the end
+    {id:"prospective_plant",type:"prospective_plant",section:"Memory",
+      prompt:"Important: Please remember this instruction for later.",
+      subtext:"At the very end of this test, you will be asked: 'Do you remember what we asked you to do?' — The answer is: tell us your city again. Remember that."},
+
     // MEMORY — word plant
     {id:"memory_plant",type:"memory_display",section:"Memory",
       prompt:"Look at these 3 words carefully.",
@@ -82,14 +96,14 @@ function buildSteps() {
     {id:"orient_date", type:"typed",section:"Orientation",prompt:"What is today's date — just the number?", placeholder:"e.g. 9"},
     {id:"orient_place",type:"typed",section:"Orientation",prompt:"What city or town are you in right now?", placeholder:"Type the city name…"},
 
-    // SERIAL 7s
-    {id:"s7_1",type:"typed",section:"Attention",prompt:`Start with ${serial.start} and take away 7. What do you get?`, placeholder:"Your answer…",hint:`${serial.start} minus 7 = ?`},
-    {id:"s7_2",type:"typed",section:"Attention",prompt:"Now take away 7 from that number.",                            placeholder:"Your answer…",hint:"Your last answer minus 7"},
-    {id:"s7_3",type:"typed",section:"Attention",prompt:"Take away 7 again. What is the result?",                      placeholder:"Your answer…",hint:"Your last answer minus 7"},
-    {id:"s7_4",type:"typed",section:"Attention",prompt:"Once more — take away 7.",                                    placeholder:"Your answer…",hint:"Your last answer minus 7"},
-    {id:"s7_5",type:"typed",section:"Attention",prompt:"Last one — take away 7 one final time.",                      placeholder:"Your answer…",hint:"Your last answer minus 7"},
+    // SERIAL 7s — randomised start and step
+    {id:"s7_1",type:"typed",section:"Attention",prompt:`Start with ${serial.start} and take away ${serial.step}. What do you get?`, placeholder:"Your answer…",hint:`${serial.start} minus ${serial.step} = ?`},
+    {id:"s7_2",type:"typed",section:"Attention",prompt:`Now take away ${serial.step} from that number.`,                              placeholder:"Your answer…",hint:`Your last answer minus ${serial.step}`},
+    {id:"s7_3",type:"typed",section:"Attention",prompt:`Take away ${serial.step} again. What is the result?`,                         placeholder:"Your answer…",hint:`Your last answer minus ${serial.step}`},
+    {id:"s7_4",type:"typed",section:"Attention",prompt:`Once more — take away ${serial.step}.`,                                       placeholder:"Your answer…",hint:`Your last answer minus ${serial.step}`},
+    {id:"s7_5",type:"typed",section:"Attention",prompt:`Last one — take away ${serial.step} one final time.`,                         placeholder:"Your answer…",hint:`Your last answer minus ${serial.step}`},
 
-    // DIGIT SPAN BACKWARD
+    // DIGIT SPAN BACKWARD — now 4 levels including 5-digit
     {id:"dsb_2",type:"digit_span",section:"Attention",
       prompt:"I will show you some numbers. Type them in REVERSE order — backwards.",
       subtext:"Example: if you see  3 – 1  →  you type  1 3",
@@ -98,12 +112,19 @@ function buildSteps() {
       prompt:"Good! Now try 3 numbers in reverse order.",
       digits:digits.d3.shown, answer:digits.d3.answer, hint:digits.d3.hint},
     {id:"dsb_4",type:"digit_span",section:"Attention",
-      prompt:"Last one — 4 numbers in reverse order.",
+      prompt:"Excellent! Now 4 numbers in reverse order.",
       digits:digits.d4.shown, answer:digits.d4.answer, hint:digits.d4.hint},
+    {id:"dsb_5",type:"digit_span",section:"Attention",
+      prompt:"Last one — 5 numbers in reverse order. Take your time.",
+      digits:digits.d5.shown, answer:digits.d5.answer, hint:digits.d5.hint},
 
-    // LANGUAGE — naming
-    {id:"name_pencil",type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"✏️",hint:"You hold it and use it to write on paper"},
-    {id:"name_watch", type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"⌚",hint:"You wear it on your wrist — it tells you the time"},
+    // NAMING — 6 objects: easy → medium → hard
+    {id:"name_pencil",    type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"✏️",hint:"You hold it and use it to write on paper"},
+    {id:"name_watch",     type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"⌚",hint:"You wear it on your wrist — it tells you the time"},
+    {id:"name_key",       type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"🔑",hint:"You use it to open a lock or a door"},
+    {id:"name_scissors",  type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"✂️",hint:"You use it to cut paper or cloth — it has two blades"},
+    {id:"name_thermometer",type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"🌡️",hint:"This tool measures body temperature — doctors use it when you have a fever"},
+    {id:"name_compass",   type:"image_name",section:"Language",prompt:"What is this object called?",emoji:"🧭",hint:"This tool helps you find directions like north, south, east and west"},
 
     // LANGUAGE — command, writing
     {id:"command",type:"command",section:"Language",
@@ -147,13 +168,13 @@ function buildSteps() {
       subtext:"Think carefully. Re-read the story in your mind.",
       options:["No, the story did not mention money","Yes, the story mentioned money"]},
 
-    // ── DISTRACTOR QUESTION (mid-test — standard clinical practice) ──
+    // DISTRACTOR QUESTION
     {id:"distractor_q",type:"choice",section:"Attention",
       prompt:"Quick question before we continue — which of these is a planet in our solar system?",
       subtext:"This is a short break question. Just pick the right answer.",
       options:["Mars","Pluto (dwarf planet)","The Moon","The Sun"]},
 
-    // PICTURE
+    // PICTURE DESCRIPTION
     {id:"picture_describe",type:"picture_describe",section:"Language",
       prompt:"Look at this kitchen picture. Describe everything you see.",
       subtext:"Tell us about every person, every action, every object. No wrong answers."},
@@ -175,7 +196,7 @@ function buildSteps() {
       subtext:"Use the hints below to try and recall the words you could not remember.",
       cues:wordSet.cues},
 
-    // PROSPECTIVE MEMORY
+    // PROSPECTIVE MEMORY CHECK
     {id:"prospective_memory",type:"choice",section:"Memory",
       prompt:"At the very beginning of this test, we asked you to remember to do something at the end. Do you remember what it was?",
       subtext:"We asked you to tell us your city again at the end of the test.",
@@ -200,7 +221,8 @@ function buildSteps() {
     wordSet,
     serialAnswers: serial.answers,
     serialStart: serial.start,
-    digitAnswers: { d2:digits.d2.answer, d3:digits.d3.answer, d4:digits.d4.answer },
+    serialStep: serial.step,
+    digitAnswers: { d2:digits.d2.answer, d3:digits.d3.answer, d4:digits.d4.answer, d5:digits.d5.answer },
     letterUsed: letterSet.letter,
   }
 
@@ -296,6 +318,25 @@ function ProgressBar({current,total}:{current:number;total:number}) {
 
 // ═══ STEP COMPONENTS ═══════════════════════════════════════════════════════
 
+function ProspectivePlantStep({onNext}:any) {
+  const [confirmed,setConfirmed]=useState(false)
+  useEffect(()=>{const t=setTimeout(()=>setConfirmed(true),3000);return()=>clearTimeout(t)},[])
+  return (
+    <div style={{textAlign:"center"}}>
+      <div style={{background:"rgba(245,158,11,0.07)",border:"1px solid rgba(245,158,11,0.25)",borderRadius:18,padding:"28px 22px",marginBottom:22}}>
+        <p style={{color:"#fcd34d",fontSize:13,fontFamily:"monospace",letterSpacing:"0.08em",marginBottom:14}}>📌 REMEMBER THIS FOR LATER</p>
+        <p style={{fontSize:19,color:"#f9fafb",lineHeight:1.9,fontWeight:500}}>
+          At the <strong style={{color:"#fcd34d"}}>very end</strong> of this test,<br/>
+          we will ask if you remember this.<br/>
+          The answer to give is: <strong style={{color:"#6ee7b7"}}>tell us your city again.</strong>
+        </p>
+      </div>
+      <p style={{color:"#9ca3af",fontSize:14,marginBottom:20,lineHeight:1.7}}>Read this carefully. You will need to recall this instruction much later in the test.</p>
+      <button className="btn-green" style={{fontSize:17,padding:"14px 36px",opacity:confirmed?1:0.5}} onClick={()=>onNext("seen")}>I will remember it →</button>
+    </div>
+  )
+}
+
 function MemoryDisplay({step,onNext}:any) {
   const [ready,setReady]=useState(false)
   const words = step.words || ["Apple","Table","Penny"]
@@ -306,7 +347,7 @@ function MemoryDisplay({step,onNext}:any) {
         Say each word out loud — <strong style={{color:"#e5e7eb"}}>two or three times</strong>.<br/>You will need to recall them much later.
       </p>
       <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:28}}>
-        {words.map((w:string,i:number)=>(
+        {words.map((w:string)=>(
           <div key={w} style={{background:"rgba(52,211,153,0.1)",border:"1px solid rgba(52,211,153,0.45)",borderRadius:16,padding:"22px 34px",fontSize:26,fontWeight:700,color:"#6ee7b7"}}>{w}</div>
         ))}
       </div>
@@ -403,11 +444,14 @@ function DigitSpanStep({step,onNext}:any) {
   const ref=useRef<HTMLInputElement>(null)
   useEffect(()=>{setVal("");setTimeout(()=>ref.current?.focus(),300)},[step.id])
   const go=()=>{if(val.trim())onNext(val.trim())}
+  const digitCount = step.digits?.split("–").length || 3
   return (
     <div>
       {step.subtext&&<p style={{color:"#9ca3af",fontSize:14,marginBottom:18,lineHeight:1.75}}>{step.subtext}</p>}
       <div style={{background:"rgba(165,180,252,0.08)",border:"1px solid rgba(165,180,252,0.3)",borderRadius:16,padding:"26px",textAlign:"center",marginBottom:22}}>
-        <p style={{color:"#a5b4fc",fontSize:11,fontFamily:"monospace",letterSpacing:"0.1em",marginBottom:14}}>NUMBERS TO REVERSE:</p>
+        <p style={{color:"#a5b4fc",fontSize:11,fontFamily:"monospace",letterSpacing:"0.1em",marginBottom:14}}>
+          {digitCount>=5?"⚠️ CHALLENGE: 5 NUMBERS TO REVERSE:":"NUMBERS TO REVERSE:"}
+        </p>
         <p style={{fontSize:36,fontWeight:700,color:"#f9fafb",letterSpacing:"0.15em",marginBottom:12}}>{step.digits}</p>
         <p style={{color:"#6b7280",fontSize:13}}>Type them backwards — last number first</p>
       </div>
@@ -541,12 +585,11 @@ function FluencyLetterStep({step,onNext}:any) {
   )
 }
 
-// ── CLOCK DRAW — AI analyses drawing description ────────────────────────────
+// ── CLOCK DRAW ──────────────────────────────────────────────────────────────
 function ClockDrawStep({onNext}:any) {
   const [phase,setPhase]=useState<"draw"|"describe"|"analysing"|"done">("draw")
   const [desc,setDesc]=useState("")
   const [result,setResult]=useState<{score:number;note:string}|null>(null)
-  const [drawn,setDrawnDone]=useState(false)
 
   const bgFn=(ctx:CanvasRenderingContext2D,w:number,h:number)=>{
     ctx.strokeStyle="rgba(110,231,183,0.12)";ctx.lineWidth=1
@@ -614,7 +657,7 @@ function ClockDrawStep({onNext}:any) {
   )
 }
 
-// ── PENTAGON DRAW — AI analyses drawing description ─────────────────────────
+// ── PENTAGON DRAW ──────────────────────────────────────────────────────────
 function PentagonDrawStep({onNext}:any) {
   const [phase,setPhase]=useState<"draw"|"describe"|"analysing"|"done">("draw")
   const [desc,setDesc]=useState("")
@@ -722,114 +765,65 @@ function PictureDescribeStep({onNext}:any) {
   return(
     <div>
       <p style={{color:"#9ca3af",fontSize:14,marginBottom:14,lineHeight:1.75}}>
-        Look carefully at this picture. Describe <strong style={{color:"#e5e7eb"}}>every person, every action, every object</strong> you can see. The more detail the better.
+        Look carefully at this picture. Describe <strong style={{color:"#e5e7eb"}}>every person, every action, every object</strong> you can see.
       </p>
-
-      {/* Boston Cookie Theft Scene — detailed SVG */}
+      {/* Boston Cookie Theft Scene */}
       <div style={{background:"#f5ede0",borderRadius:16,padding:"12px",marginBottom:16,border:"2px solid rgba(200,160,106,0.4)"}}>
         <p style={{color:"#7a5230",fontSize:10,fontFamily:"monospace",letterSpacing:"0.08em",textAlign:"center",marginBottom:8}}>🖼️ LOOK AT THIS PICTURE CAREFULLY — describe everything you see</p>
         <svg viewBox="0 0 500 300" style={{width:"100%",borderRadius:10,display:"block"}} xmlns="http://www.w3.org/2000/svg">
-          {/* Wall */}
           <rect width="500" height="300" fill="#f0e6d3"/>
-          {/* Floor */}
           <rect x="0" y="220" width="500" height="80" fill="#d4b896"/>
           <line x1="0" y1="220" x2="500" y2="220" stroke="#b8956a" strokeWidth="2"/>
-          {/* Window */}
           <rect x="25" y="35" width="95" height="110" fill="#b8d9f0" stroke="#8b7355" strokeWidth="2.5" rx="3"/>
           <line x1="72" y1="35" x2="72" y2="145" stroke="#8b7355" strokeWidth="2"/>
           <line x1="25" y1="90" x2="120" y2="90" stroke="#8b7355" strokeWidth="2"/>
-          <rect x="25" y="35" width="20" height="110" fill="#e8c4a0" opacity="0.5"/>
-          <rect x="100" y="35" width="20" height="110" fill="#e8c4a0" opacity="0.5"/>
-          {/* Cupboard */}
           <rect x="295" y="15" width="190" height="125" fill="#c8a06a" stroke="#8b7355" strokeWidth="2" rx="3"/>
           <line x1="390" y1="15" x2="390" y2="140" stroke="#8b7355" strokeWidth="2"/>
           <rect x="295" y="15" width="95" height="125" fill="#e0b87a" stroke="#8b7355" strokeWidth="1.5" rx="2"/>
-          {/* Cookie jar */}
           <rect x="308" y="50" width="52" height="70" fill="#cd853f" stroke="#8b5a2b" strokeWidth="2" rx="7"/>
           <rect x="311" y="44" width="46" height="14" fill="#a0522d" rx="4"/>
           <text x="334" y="92" fill="#fff" fontSize="9" fontFamily="monospace" textAnchor="middle">COOKIES</text>
-          {/* Falling cookies */}
           <circle cx="365" cy="105" r="9" fill="#d2691e" stroke="#8b4513" strokeWidth="1.5"/>
           <circle cx="350" cy="118" r="8" fill="#d2691e" stroke="#8b4513" strokeWidth="1.5"/>
           <circle cx="372" cy="122" r="7" fill="#d2691e" stroke="#8b4513" strokeWidth="1.5"/>
-          <circle cx="363" cy="102" r="2" fill="#4a2800"/><circle cx="369" cy="108" r="2" fill="#4a2800"/>
-          <circle cx="347" cy="116" r="2" fill="#4a2800"/><circle cx="354" cy="121" r="2" fill="#4a2800"/>
-          {/* Stool — tipping */}
           <rect x="325" y="158" width="58" height="7" fill="#8b7355" rx="3" transform="rotate(-8,325,158)"/>
           <rect x="330" y="164" width="7" height="56" fill="#8b7355"/>
           <rect x="366" y="164" width="7" height="56" fill="#8b7355"/>
-          {/* tipping arrow */}
-          <path d="M320,155 L305,168" stroke="#ef4444" strokeWidth="2" strokeDasharray="4" markerEnd="url(#arr)"/>
-          {/* BOY */}
           <circle cx="352" cy="98" r="17" fill="#fdbcb4"/>
           <path d="M335,90 Q352,76 369,90" fill="#4a3728"/>
           <rect x="337" y="113" width="30" height="46" fill="#4a90d9" rx="5"/>
-          {/* reaching arm */}
           <line x1="367" y1="125" x2="392" y2="88" stroke="#fdbcb4" strokeWidth="9" strokeLinecap="round"/>
           <circle cx="395" cy="85" r="7" fill="#fdbcb4"/>
-          {/* other arm */}
           <line x1="337" y1="125" x2="320" y2="142" stroke="#fdbcb4" strokeWidth="9" strokeLinecap="round"/>
-          <rect x="340" y="157" width="11" height="9" fill="#1e3a6e"/>
-          <rect x="356" y="157" width="11" height="9" fill="#1e3a6e"/>
-          {/* GIRL */}
           <circle cx="272" cy="132" r="15" fill="#fdbcb4"/>
           <path d="M257,126 Q272,113 287,126" fill="#6b3a2a"/>
           <rect x="258" y="145" width="28" height="44" fill="#e879a0" rx="5"/>
           <line x1="258" y1="158" x2="240" y2="172" stroke="#fdbcb4" strokeWidth="7" strokeLinecap="round"/>
           <line x1="286" y1="158" x2="304" y2="152" stroke="#fdbcb4" strokeWidth="7" strokeLinecap="round"/>
-          <rect x="262" y="187" width="9" height="35" fill="#c0392b"/>
-          <rect x="275" y="187" width="9" height="35" fill="#c0392b"/>
-          <rect x="260" y="220" width="13" height="5" fill="#222" rx="2"/>
-          <rect x="273" y="220" width="13" height="5" fill="#222" rx="2"/>
-          {/* SINK */}
           <rect x="128" y="175" width="118" height="50" fill="#a8bcd4" stroke="#7a9bb5" strokeWidth="2" rx="3"/>
           <rect x="138" y="183" width="98" height="35" fill="#7fb3d3" rx="3"/>
-          {/* faucet */}
           <rect x="180" y="163" width="7" height="20" fill="#999"/>
           <rect x="172" y="163" width="23" height="5" fill="#999" rx="3"/>
-          {/* OVERFLOWING WATER */}
           <path d="M138,218 Q148,232 143,250 Q158,240 153,255 Q168,245 163,260 Q178,250 173,264 Q188,254 183,268 Q198,260 205,272 Q218,262 222,275 Q232,265 236,278 L138,278Z" fill="#7fb3d3" opacity="0.75"/>
-          <ellipse cx="165" cy="250" rx="14" ry="4" fill="#7fb3d3" opacity="0.6"/>
-          <ellipse cx="200" cy="262" rx="16" ry="4" fill="#7fb3d3" opacity="0.55"/>
-          {/* WOMAN */}
           <circle cx="162" cy="128" r="18" fill="#fdbcb4"/>
           <path d="M144,121 Q162,106 180,121 Q180,108 162,103 Q144,108 144,121Z" fill="#8b6347"/>
           <rect x="146" y="144" width="33" height="52" fill="#7c5cbf" rx="5"/>
-          <rect x="150" y="150" width="25" height="43" fill="#f0e6d3" opacity="0.65" rx="3"/>
-          {/* drying arm */}
           <line x1="146" y1="160" x2="126" y2="180" stroke="#fdbcb4" strokeWidth="8" strokeLinecap="round"/>
           <ellipse cx="114" cy="186" rx="16" ry="20" fill="#e8e8e8" stroke="#ccc" strokeWidth="2"/>
-          {/* other arm to sink */}
           <line x1="179" y1="160" x2="196" y2="176" stroke="#fdbcb4" strokeWidth="8" strokeLinecap="round"/>
-          <rect x="150" y="194" width="11" height="28" fill="#4a3060"/>
-          <rect x="165" y="194" width="11" height="28" fill="#4a3060"/>
-          <rect x="148" y="220" width="15" height="5" fill="#222" rx="2"/>
-          <rect x="163" y="220" width="15" height="5" fill="#222" rx="2"/>
-          {/* Counter shelf */}
           <rect x="128" y="225" width="362" height="10" fill="#c8a06a" stroke="#8b7355" strokeWidth="1"/>
-          {/* Plate on counter */}
-          <ellipse cx="455" cy="224" rx="28" ry="7" fill="#e8e8e8" stroke="#ccc" strokeWidth="1"/>
-          {/* Label arrows */}
           <text x="352" y="295" fill="#7a5230" fontSize="8" fontFamily="monospace" textAnchor="middle">boy stealing cookies</text>
           <text x="162" y="295" fill="#1a6491" fontSize="8" fontFamily="monospace" textAnchor="middle">water overflowing</text>
           <text x="272" y="295" fill="#9a2070" fontSize="8" fontFamily="monospace" textAnchor="middle">girl watching</text>
         </svg>
-        <p style={{color:"#8b7355",fontSize:11,textAlign:"center",marginTop:6,fontFamily:"monospace",lineHeight:1.6}}>
-          Tell us everything: Who is there? What are they doing? Is anything wrong?
-        </p>
       </div>
-
       <textarea className="inp" rows={6}
         placeholder="Describe everything you see: the people, what they are doing, what objects are there, anything unusual happening…"
         value={val} onChange={e=>setVal(e.target.value)}
         style={{resize:"none",minHeight:130,fontSize:15}}/>
-
       <div style={{background:"rgba(99,102,241,0.06)",border:"1px solid rgba(99,102,241,0.2)",borderRadius:10,padding:"10px 14px",marginTop:10,marginBottom:14}}>
-        <p style={{color:"#a5b4fc",fontSize:12,lineHeight:1.6}}>
-          💡 Look carefully — describe the woman, the child, the water, the cupboard, the stool. More detail = better score.
-        </p>
+        <p style={{color:"#a5b4fc",fontSize:12,lineHeight:1.6}}>💡 Describe the woman, the child, the water, the cupboard, the stool. More detail = better score.</p>
       </div>
-
       {!result?(
         <button className="btn-green" style={{width:"100%",fontSize:17,padding:"15px",opacity:val.trim().length>10?1:0.4}}
           onClick={analyse} disabled={loading||val.trim().length<10}>
@@ -848,7 +842,7 @@ function PictureDescribeStep({onNext}:any) {
   )
 }
 
-// ═══ SPEECH — rebuilt, zero repeat bug ══════════════════════════════════════
+// ═══ SPEECH ══════════════════════════════════════════════════════════════════
 function SpeechRecordStep({step,onNext}:any) {
   const [phase,setPhase]=useState<"ready"|"recording"|"done"|"analysing"|"complete">("ready")
   const [transcript,setTranscript]=useState("")
@@ -1085,22 +1079,32 @@ export default function Home() {
   const [aiLoading,setAiLoading]=useState(false)
   const [saving,setSaving]=useState(false)
   const [session,setSession]=useState(()=>buildSteps())
+  // Response time tracking
+  const stepStartTime=useRef<number>(Date.now())
 
   const total=session.steps.length
   const step=session.steps[stepIdx]||null
   const isResults=stepIdx>=total
 
+  // Start timer whenever step changes
+  useEffect(()=>{
+    stepStartTime.current=Date.now()
+  },[stepIdx])
+
   const saveAndNext=async(value:string)=>{
     if(!step)return
+    const elapsed=Date.now()-stepStartTime.current
     const next={...answers,[step.id]:value} as Record<string,string>
+    // Store response time for this step
+    next[`_time_${step.id}`]=String(elapsed)
     if(step.type==="fluency_animals") next["animal_fluency_count"]=value
     if(step.type==="fluency_letter")  next["letter_fluency_count"]=value
-    // Store session meta so scoring uses the right answers
     if(step.id==="clock_draw")    next["clock_score"]=value
     if(step.id==="pentagon_draw") next["pentagon_score"]=value
     next["_serial_answers"] = JSON.stringify(session.meta.serialAnswers)
     next["_digit_answers"]  = JSON.stringify(session.meta.digitAnswers)
     next["_word_set"]       = JSON.stringify(session.meta.wordSet.words)
+    next["_letter_used"]    = session.meta.letterUsed
     setAnswers(next)
     if(stepIdx+1>=total){await finish(next)}
     else{setStepIdx(i=>i+1)}
@@ -1135,58 +1139,42 @@ export default function Home() {
   }
 
   const brainScores=results&&answers?(()=>{
-    const wordSet = session.meta.wordSet.words.map((w:string)=>w.toLowerCase())
-    const recalled=(answers.memory_recall||"").toLowerCase()
-    const memFree=wordSet.filter((w:string)=>recalled.includes(w)).length
-    const memCued=wordSet.filter((w:string)=>(answers.cued_recall||"").toLowerCase().includes(w)).length
-    const memStory=[
-      !!(answers.sr_name||"").toLowerCase().match(/maria|james|priya/),
-      !!(answers.sr_day||"").toLowerCase().match(/tuesday|friday|monday/),
-      !!(answers.sr_forgot||"").toLowerCase().match(/list|shopping|card|library|document|insurance/),
-      !!(answers.sr_neighbour||"").toLowerCase().match(/john|sarah|raju/),
-    ].filter(Boolean).length
-    const memTotal=memFree+memCued+memStory
-    const now=new Date()
-    const oriPts=[
-      (answers.orient_year||"").trim()===String(now.getFullYear()),
-      (answers.orient_month||"").trim().toLowerCase()===now.toLocaleString("en",{month:"long"}).toLowerCase(),
-      (answers.orient_day||"").trim().toLowerCase()===now.toLocaleString("en",{weekday:"long"}).toLowerCase(),
-      (answers.orient_date||"").trim()===String(now.getDate()),
-      (answers.orient_place||"").trim().length>1,
-    ].filter(Boolean).length
-    const serialCorrect: number[] = session.meta.serialAnswers
-    const attPts=serialCorrect.filter((v:number,i:number)=>parseInt([answers.s7_1,answers.s7_2,answers.s7_3,answers.s7_4,answers.s7_5][i])===v).length
-    const digitCorrect = session.meta.digitAnswers
-    const dsbScore=((answers.dsb_2||"").replace(/[\s\-,.]/g,"")=== digitCorrect.d2?1:0)+((answers.dsb_3||"").replace(/[\s\-,.]/g,"")=== digitCorrect.d3?1:0)+((answers.dsb_4||"").replace(/[\s\-,.]/g,"")=== digitCorrect.d4?1:0)
-    const langPts=((answers.name_pencil||"").toLowerCase().includes("pencil")?1:0)+(!!(answers.name_watch||"").toLowerCase().match(/watch|clock/)?1:0)+(answers.command==="done"?1:0)+((answers.writing||"").trim().split(/\s+/).length>=3?1:0)
-    const visPts=parseInt(answers.clock_score||"0")+parseInt(answers.pentagon_score||"0")
-    return{memTotal,oriPts,attPts,dsbScore,langPts,visPts,spkPts:parseInt(answers.speech_record||"0")}
+    const ss=results.sectionScores||{}
+    return{
+      memTotal:  ss.memory?.pts||0,      memMax:  ss.memory?.max||16,
+      oriPts:    ss.orientation?.pts||0, oriMax:  ss.orientation?.max||5,
+      attPts:    ss.attention?.pts||0,   attMax:  ss.attention?.max||9,
+      langPts:   ss.language?.pts||0,    langMax: ss.language?.max||18,
+      visPts:    ss.visuospatial?.pts||0,visMax:  ss.visuospatial?.max||7,
+      spkPts:    ss.speech?.pts||0,      spkMax:  ss.speech?.max||5,
+    }
   })():null
 
   const renderStep=()=>{
     if(!step)return null
     const p={step,onNext:saveAndNext}
     switch(step.type){
-      case "memory_display":   return <MemoryDisplay {...p}/>
-      case "text":             return <TypedInput {...p}/>
-      case "number":           return <TypedInput {...p}/>
-      case "typed":            return <TypedInput {...p}/>
-      case "select":           return <SelectStep {...p}/>
-      case "image_name":       return <ImageName {...p}/>
-      case "command":          return <CommandStep {...p}/>
-      case "textarea":         return <TextareaStep {...p}/>
-      case "recall":           return <RecallStep {...p}/>
-      case "cued_recall":      return <CuedRecallStep {...p}/>
-      case "choice":           return <SelectStep {...p}/>
-      case "clock_draw":       return <ClockDrawStep {...p}/>
-      case "pentagon_draw":    return <PentagonDrawStep {...p}/>
-      case "story_read":       return <StoryReadStep {...p}/>
-      case "picture_describe": return <PictureDescribeStep {...p}/>
-      case "speech_record":    return <SpeechRecordStep {...p}/>
-      case "digit_span":       return <DigitSpanStep {...p}/>
-      case "fluency_animals":  return <FluencyAnimalsStep {...p}/>
-      case "fluency_letter":   return <FluencyLetterStep {...p}/>
-      default:                 return <TypedInput {...p}/>
+      case "prospective_plant": return <ProspectivePlantStep {...p}/>
+      case "memory_display":    return <MemoryDisplay {...p}/>
+      case "text":              return <TypedInput {...p}/>
+      case "number":            return <TypedInput {...p}/>
+      case "typed":             return <TypedInput {...p}/>
+      case "select":            return <SelectStep {...p}/>
+      case "image_name":        return <ImageName {...p}/>
+      case "command":           return <CommandStep {...p}/>
+      case "textarea":          return <TextareaStep {...p}/>
+      case "recall":            return <RecallStep {...p}/>
+      case "cued_recall":       return <CuedRecallStep {...p}/>
+      case "choice":            return <SelectStep {...p}/>
+      case "clock_draw":        return <ClockDrawStep {...p}/>
+      case "pentagon_draw":     return <PentagonDrawStep {...p}/>
+      case "story_read":        return <StoryReadStep {...p}/>
+      case "picture_describe":  return <PictureDescribeStep {...p}/>
+      case "speech_record":     return <SpeechRecordStep {...p}/>
+      case "digit_span":        return <DigitSpanStep {...p}/>
+      case "fluency_animals":   return <FluencyAnimalsStep {...p}/>
+      case "fluency_letter":    return <FluencyLetterStep {...p}/>
+      default:                  return <TypedInput {...p}/>
     }
   }
 
@@ -1215,12 +1203,13 @@ export default function Home() {
                 {[
                   ["🧩","Remember 3 words","Shown to you first — no trick"],
                   ["📍","Answer easy questions","Date, day, city"],
-                  ["🔢","Reverse some numbers","Tests working memory"],
+                  ["🔢","Reverse some numbers","Tests working memory — up to 5 digits"],
+                  ["🔑","Name 6 objects","From easy to harder — tests word-finding"],
                   ["🐾","Name animals in 60 seconds","Simple and quick"],
                   ["🕐","Draw a clock","AI analyses your drawing"],
                   ["📖","Read and remember a story","4 simple questions after"],
                   ["🎙️","Read one sentence aloud","AI checks your speech"],
-                  ["🤖","Get your brain report","AI explains what each result means — in plain words"],
+                  ["🤖","Get your brain report","AI explains every result in plain words"],
                 ].map(([icon,title,desc])=>(
                   <div key={String(title)} style={{display:"flex",alignItems:"flex-start",gap:14,marginBottom:14}}>
                     <span style={{fontSize:20,flexShrink:0,marginTop:1}}>{icon}</span>
@@ -1232,7 +1221,7 @@ export default function Home() {
                 ))}
               </div>
               <div style={{display:"inline-flex",alignItems:"center",gap:8,background:"rgba(52,211,153,0.07)",border:"1px solid rgba(52,211,153,0.17)",borderRadius:20,padding:"8px 20px",fontFamily:"monospace",fontSize:11,color:"#6ee7b7",marginBottom:26,letterSpacing:"0.05em"}}>
-                ⏱ About 15–20 minutes &nbsp;•&nbsp; No right or wrong answers
+                ⏱ About 20–25 minutes &nbsp;•&nbsp; No right or wrong answers
               </div><br/>
               <button className="btn-green" style={{fontSize:19,padding:"17px 46px"}} onClick={()=>setStepIdx(0)}>Begin →</button>
               <p style={{color:"#4b5563",fontSize:12,marginTop:16,lineHeight:1.7}}>Your results are private. This is a screening tool — not a medical diagnosis.</p>
@@ -1280,12 +1269,12 @@ export default function Home() {
                 <div style={{marginBottom:16}}>
                   <p style={{fontFamily:"monospace",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",color:"#6b7280",marginBottom:10}}>🧠 BRAIN REGION ANALYSIS</p>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9}}>
-                    <BrainCard label="Memory" region="Hippocampus" score={brainScores.memTotal} max={10} accent="#a5b4fc"/>
-                    <BrainCard label="Orientation" region="Hippocampus + Parietal" score={brainScores.oriPts} max={5} accent="#6ee7b7"/>
-                    <BrainCard label="Attention" region="Prefrontal Cortex" score={brainScores.attPts} max={5} accent="#fcd34d"/>
-                    <BrainCard label="Working Memory" region="Prefrontal Cortex" score={brainScores.dsbScore} max={3} accent="#fbbf24"/>
-                    <BrainCard label="Language+Fluency" region="Temporal + Frontal" score={brainScores.langPts} max={4} accent="#f9a8d4"/>
-                    <BrainCard label="Visuospatial" region="Parietal + Occipital" score={brainScores.visPts} max={7} accent="#93c5fd"/>
+                    <BrainCard label="Memory" region="Hippocampus" score={brainScores.memTotal} max={brainScores.memMax} accent="#a5b4fc"/>
+                    <BrainCard label="Orientation" region="Hippocampus + Parietal" score={brainScores.oriPts} max={brainScores.oriMax} accent="#6ee7b7"/>
+                    <BrainCard label="Attention" region="Prefrontal Cortex" score={brainScores.attPts} max={brainScores.attMax} accent="#fcd34d"/>
+                    <BrainCard label="Language+Naming" region="Temporal + Frontal" score={brainScores.langPts} max={brainScores.langMax} accent="#f9a8d4"/>
+                    <BrainCard label="Visuospatial" region="Parietal + Occipital" score={brainScores.visPts} max={brainScores.visMax} accent="#93c5fd"/>
+                    <BrainCard label="Speech" region="Broca's Area" score={brainScores.spkPts} max={brainScores.spkMax} accent="#fca5a5"/>
                   </div>
                 </div>
               )}
@@ -1294,7 +1283,7 @@ export default function Home() {
                 {[
                   ["MMSE",`${results.mmse}/30`,results.mmse>=24?"Normal":results.mmse>=18?"Mild":"Low"],
                   ["Clock",`${answers.clock_score||"—"}/5`,"Drawing"],
-                  ["Speech",`${answers.speech_record||"—"}/5`,"Fluency"],
+                  ["Naming",`${[answers.name_pencil,answers.name_watch,answers.name_key,answers.name_scissors,answers.name_thermometer,answers.name_compass].filter(v=>v&&v.length>0).length}/6`,"Objects"],
                   ["Animals",`${results.animals||"—"}`,"Fluency/min"],
                 ].map(([label,v,sub])=>(
                   <div key={String(label)} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"13px 10px",textAlign:"center"}}>
@@ -1304,6 +1293,15 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+
+              {/* Timing summary */}
+              {results.slowQuestions&&results.slowQuestions.length>0&&(
+                <div style={{background:"rgba(245,158,11,0.06)",border:"1px solid rgba(245,158,11,0.2)",borderRadius:12,padding:"12px 16px",marginBottom:14}}>
+                  <p style={{color:"#fcd34d",fontSize:12,lineHeight:1.7}}>
+                    ⏱ <strong>Timing note:</strong> {results.slowQuestions.length} question(s) took over 20 seconds. Average response time: {Math.round(results.avgTimeMs/1000)}s. Slow response on cognitive tasks is a separate clinical marker.
+                  </p>
+                </div>
+              )}
 
               <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:12,padding:"13px 16px",marginBottom:16}}>
                 <div style={{fontFamily:"monospace",fontSize:9,letterSpacing:"0.1em",textTransform:"uppercase",color:"#6b7280",marginBottom:5}}>PATIENT</div>
