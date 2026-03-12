@@ -4,89 +4,194 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== 'POST') return res.status(405).end()
   const { description, type } = req.body
 
-  // If completely empty
-  if (!description || description.trim().length < 2) {
+  if (!description || description.trim().length < 1) {
     return res.json({ score: 0, note: 'No description was provided.' })
   }
 
   let prompt = ''
 
   if (type === 'picture') {
-    prompt = `You are a clinical neuropsychologist scoring the Boston Cookie Theft Picture Description Test.
+    prompt = `You are a clinical neuropsychologist scoring the Boston Cookie Theft Picture Description Test for an INDIAN POPULATION screening test.
 
-The picture shows a kitchen scene with these elements:
-- A WOMAN standing at a sink washing/drying dishes
-- The sink is OVERFLOWING with water onto the floor
-- A BOY standing on a STOOL reaching up to steal COOKIES from a jar in a cupboard
-- The STOOL is tipping over / wobbling
-- A GIRL standing nearby watching the boy
+The picture shows a kitchen scene:
+- A WOMAN at a sink washing/drying dishes
+- The sink is OVERFLOWING — water spilling onto the floor
+- A BOY standing on a STOOL reaching up stealing COOKIES from a jar in a cupboard
+- The STOOL is tipping/falling over
+- A GIRL standing watching the boy
 - A WINDOW on the wall
-- DISHES and plates
+- DISHES and plates visible
 
-Patient's description: "${description}"
+Patient said: "${description}"
 
-YOUR JOB: Read what the patient said and count how many things from the scene they mentioned.
+IMPORTANT CONTEXT:
+- Patients may be elderly, uneducated, or describe in broken English
+- Patients may use Indian English ("aunty", "amma", "child", "small boy", "vessel", "tumbler", "biscuits" instead of cookies)
+- Short answers are okay — score based on what they noticed, not how they said it
+- Even one correct observation deserves a score of 1
 
-SCORING — be FAIR and GENEROUS. If they mentioned it even approximately, count it:
-- "child" or "kid" or "boy" = boy counted
-- "cookies" or "biscuits" or "jar" = cookie jar counted
-- "water" or "flood" or "sink" or "tap" = sink/overflow counted
-- "woman" or "lady" or "mother" = woman counted
-- "stool" or "chair" or "standing on something" = stool counted
-- "girl" or "another child" = girl counted
-- "stealing" or "reaching" or "taking" = stealing action counted
+SCORE 1 TO 5 — here are MANY examples for each level so you understand the range:
 
-SCORE:
-5 = mentioned 7+ elements with good detail and described actions
-4 = mentioned 5-6 elements, described some actions
-3 = mentioned 3-4 elements, got the main idea
-2 = mentioned 2 elements vaguely
-1 = mentioned only 1 element OR very vague like "I see a kitchen"
-0 = said nothing relevant, completely wrong, or blank
+SCORE 5 — Rich, detailed description. Mentioned 6 or more elements. Described actions, relationships, problems.
+Examples of score 5 answers:
+- "A woman is washing dishes at the sink but the water is overflowing onto the floor. A boy is standing on a stool stealing cookies from a jar in the cupboard. The stool is about to fall. A girl is watching the boy steal."
+- "Lady washing utensils, water is flooding. Boy climbing stool to take biscuits from jar. Girl watching. Stool falling down."
+- "Amma at sink, water spilling. Boy on chair stealing cookies, stool tipping. Girl standing and looking."
+- "Woman drying plate, sink overflow on floor. Child on stool reaching cookie jar, another child watching him steal."
+- "I see a woman near the tap with water overflowing. A boy is on a stool taking cookies and the stool is tilting. A girl is watching."
 
-IMPORTANT: Even "a boy stealing cookies and a woman at the sink" = score 3 minimum.
-Do NOT give 0 unless the answer is truly blank or completely irrelevant.
+SCORE 4 — Good description. Mentioned 4-5 elements. Got main actions but missed 1-2 things.
+Examples of score 4 answers:
+- "A woman washing dishes, water overflowing. A boy stealing cookies while standing on a stool. A girl watching."
+- "Lady at sink with overflow. Boy on stool taking biscuits from cupboard. Girl nearby."
+- "Woman near tap, water spilling on floor. Boy climbing to get cookies. Another child watching."
+- "Aunty washing vessels, water is coming out. Boy stealing biscuits, standing on stool."
+- "Woman at sink. Boy on stool stealing cookies from jar. Stool falling. Girl watching."
 
-Reply ONLY with JSON: {"score":N,"note":"one sentence saying what elements the patient mentioned and what they missed"}`
+SCORE 3 — Noticed main story. Mentioned 3 elements. Got the key idea but missed several details.
+Examples of score 3 answers:
+- "A boy is stealing cookies and a woman is at the sink"
+- "Boy taking biscuits from jar. Lady washing dishes. Water overflowing."
+- "Child stealing cookies. Woman at sink. Stool tipping."
+- "Boy on stool getting cookies. Woman washing. Another child there."
+- "Kid climbing and taking something. Lady doing dishes. Water coming out."
+- "Boy stealing. Woman at tap. Girl watching."
+- "A child is taking cookies from a box and a woman is washing utensils"
+- "Small boy getting biscuits. Amma near sink."
+
+SCORE 2 — Basic observation. Mentioned 1-2 things but vague or incomplete.
+Examples of score 2 answers:
+- "I see a woman and a child in the kitchen"
+- "A boy and a lady"
+- "Someone stealing cookies"
+- "Water is overflowing in the kitchen"
+- "A child is climbing something"
+- "Lady washing, boy doing something"
+- "Kitchen scene with people"
+- "Boy and girl in kitchen"
+- "Woman doing household work"
+- "Child is taking something from shelf"
+
+SCORE 1 — Very vague. Only mentioned the setting or one very general thing. No specific details.
+Examples of score 1 answers:
+- "I see a kitchen"
+- "A house"
+- "Some people"
+- "A room"
+- "People doing things"
+- "I see a family"
+- "Looks like a home"
+- "I don't know exactly but I see some people in a room"
+- "A lady is there"
+- "Something is happening"
+
+SCORE 0 — Blank, completely off-topic, or says they cannot see anything.
+Examples of score 0 answers:
+- "" (empty)
+- "I don't know"
+- "I cannot see"
+- "I see a car" (completely wrong)
+- "Nothing"
+
+NOW score the patient's description: "${description}"
+
+Be GENEROUS and FAIR. When in doubt, give the HIGHER score.
+If the patient is elderly or using simple language, be extra generous.
+Short answers that correctly identify the main scene elements should score 3.
+
+Reply ONLY with JSON (no markdown, no extra text):
+{"score":N,"note":"one warm clinical sentence acknowledging what they got right and what was missed"}`
 
   } else if (type === 'clock') {
-    prompt = `You are a clinical neuropsychologist scoring a Clock Drawing Test.
+    prompt = `You are a clinical neuropsychologist scoring a Clock Drawing Test for an Indian population screening.
 
-The patient was asked to draw a clock showing 10:10 (ten past ten).
-The patient described their clock drawing: "${description}"
+The patient drew a clock showing 10:10 and described their drawing: "${description}"
 
-SCORE FAIRLY:
-5 = Perfect: circle + all 12 numbers + two hands pointing to 10 and 2. No errors.
-4 = Nearly perfect: circle + numbers + hands present, one small error
-3 = Partial: circle + numbers present BUT hands wrong or missing one hand
-2 = Poor: circle drawn but numbers wrong AND hands missing or wrong
-1 = Very poor: attempted but barely looks like a clock
-0 = Could not draw at all or drew something completely different
+SCORE 1 TO 5 with many possible ways to achieve each score:
 
-FAIR RULES:
-- "I drew a circle with numbers and two hands" = minimum score 4
-- "I drew a clock" with no errors mentioned = score 4
-- "I drew it but hands might be off" = score 3
-- "I struggled" or "couldn't do the hands" = score 2
-- Do NOT give 0 unless they truly could not draw anything
+SCORE 5 — Perfect clock. Circle + all 12 numbers in right places + two hands clearly at 10 and 2.
+Examples:
+- "I drew a circle, put all numbers 1 to 12, drew two hands pointing to 10 and 2"
+- "Circle with all numbers, hands at 10:10"
+- "Drew proper clock with numbers and hands showing ten past ten"
+- "Round shape, all 12 numbers, two arrows at 10 and 2"
 
-Reply ONLY with JSON: {"score":N,"note":"one clinical sentence explaining the score"}`
+SCORE 4 — Nearly perfect. Minor issue only.
+Examples:
+- "I drew the clock with all numbers and hands, but the numbers are a little crowded"
+- "Circle with numbers and two hands, hands are slightly off but mostly right"
+- "Drew a clock, all numbers there, hands roughly at 10 and 2 but not perfect"
+- "Clock with numbers, hands at 10 and 2 but 12 is at wrong position slightly"
+
+SCORE 3 — Decent attempt. Circle and numbers done but hands wrong or missing one.
+Examples:
+- "I drew a circle and wrote all numbers but I'm not sure the hands are right"
+- "Clock with numbers but only drew one hand"
+- "Circle with numbers, put hands but they might be pointing wrong"
+- "Drew the clock, numbers okay, but hands confused me"
+- "Circle with numbers 1-12, hands at 10 and 10 instead of 10 and 2"
+
+SCORE 2 — Partial attempt. Circle exists but numbers or hands have major problems.
+Examples:
+- "I drew a circle but couldn't place all the numbers correctly"
+- "Circle is there but numbers are all on one side"
+- "Drew circle and some numbers but couldn't draw the hands"
+- "I made a clock but the numbers are missing some and no hands"
+- "Circle drawn, only wrote a few numbers, no hands"
+
+SCORE 1 — Very poor attempt. Tried but result looks nothing like a clock.
+Examples:
+- "I tried to draw but it doesn't look like a clock"
+- "I drew something but couldn't do the numbers or hands"
+- "I made a shape but very rough"
+- "Drew a circle only, nothing inside"
+- "Could not draw properly, just scribbles"
+
+SCORE 0 — Could not draw at all.
+Examples:
+- "I could not draw"
+- "I don't know how to draw a clock"
+- "I left it blank"
+
+Score the patient's description: "${description}"
+Be fair. If they tried and described a reasonable attempt, give them appropriate credit.
+
+Reply ONLY with JSON: {"score":N,"note":"one sentence explaining what they drew well and what was wrong"}`
 
   } else if (type === 'pentagon') {
-    prompt = `You are a clinical neuropsychologist scoring the Intersecting Pentagons test.
+    prompt = `You are scoring the Intersecting Pentagons test for an Indian population screening.
 
 The patient was asked to copy two overlapping five-sided shapes.
-The patient described their drawing: "${description}"
+Patient described their drawing: "${description}"
 
-SCORE FAIRLY:
-2 = Drew two shapes that overlap, each roughly five-sided
-1 = Drew two shapes that overlap BUT not clearly five-sided OR barely overlap
-0 = Only one shape, shapes do not overlap, could not do it
+SCORE 0, 1, or 2:
 
-FAIR RULES:
-- "I drew two shapes overlapping" = score 1 minimum
-- "I drew two five-sided shapes that overlap" = score 2
-- "I could only draw one shape" = score 0
+SCORE 2 — Two five-sided shapes that clearly overlap. Resembles original.
+Examples:
+- "I drew two five-sided shapes overlapping each other"
+- "Two pentagons crossing each other like the original"
+- "Drew two shapes with five sides, they overlap in the middle"
+- "Two shapes overlapping, each has five corners"
+- "I copied the shapes, both overlap and have five sides"
+
+SCORE 1 — Two shapes that overlap but not clearly five-sided, OR five-sided but barely overlap.
+Examples:
+- "I drew two shapes overlapping but they look more like squares"
+- "Two shapes crossing but I couldn't make them five-sided"
+- "Drew two overlapping shapes, not sure about the sides"
+- "Two shapes, they touch a little"
+- "I drew two shapes but they don't look exactly like the picture"
+- "Two five-sided shapes but they barely overlap"
+
+SCORE 0 — Only one shape, no overlap, or could not do it.
+Examples:
+- "I could only draw one shape"
+- "I drew two shapes but they don't overlap"
+- "I couldn't copy it"
+- "Drew something but nothing like the original"
+- "Left it blank"
+
+Score the patient's description: "${description}"
 
 Reply ONLY with JSON: {"score":N,"note":"one sentence explaining the score"}`
   }
@@ -101,7 +206,7 @@ Reply ONLY with JSON: {"score":N,"note":"one sentence explaining the score"}`
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 200,
+        max_tokens: 250,
         messages: [{ role: 'user', content: prompt }]
       })
     })
@@ -113,48 +218,70 @@ Reply ONLY with JSON: {"score":N,"note":"one sentence explaining the score"}`
     let finalScore = parsed.score ?? 0
     const wordCount = description.trim().split(/\s+/).length
 
-    // Safety net — if AI gives 0 but person wrote real words, give at least 1
-    if (finalScore === 0 && wordCount >= 4) {
-      finalScore = 1
-    }
+    // Safety net — real words written = never 0 unless truly blank
+    if (finalScore === 0 && wordCount >= 3) finalScore = 1
 
-    // Extra safety for picture — check keywords directly
-    if (type === 'picture' && finalScore <= 1 && wordCount >= 3) {
+    // Extra keyword safety for picture
+    if (type === 'picture') {
       const desc = description.toLowerCase()
-      const keywords = ['woman','man','boy','girl','child','kid','cookie','water','sink','stool','chair','kitchen','dish','overflow','steal','reach','wash','window','jar','tap','flood']
-      const matched = keywords.filter((k: string) => desc.includes(k)).length
-      if (matched >= 5 && finalScore < 4) finalScore = Math.max(finalScore, 4)
-      else if (matched >= 3 && finalScore < 3) finalScore = Math.max(finalScore, 3)
-      else if (matched >= 2 && finalScore < 2) finalScore = Math.max(finalScore, 2)
-      else if (matched >= 1 && finalScore < 1) finalScore = 1
+      const highKeywords = ['overflow','overflowing','spill','flood','stool','tipping','falling','stealing','reaching','girl','watching']
+      const midKeywords  = ['woman','lady','aunty','amma','mother','boy','child','kid','cookie','biscuit','jar','sink','tap','water','dish','vessel','tumbler','wash','kitchen']
+      const highMatched = highKeywords.filter((k:string) => desc.includes(k)).length
+      const midMatched  = midKeywords.filter((k:string) => desc.includes(k)).length
+      const totalMatched = highMatched * 2 + midMatched
+
+      // Only override if AI severely underscoredst
+      if (finalScore === 0 && totalMatched >= 1) finalScore = 1
+      if (finalScore <= 1 && totalMatched >= 4) finalScore = 2
+      if (finalScore <= 2 && totalMatched >= 7) finalScore = 3
+      if (finalScore <= 3 && totalMatched >= 11) finalScore = 4
+      if (finalScore <= 4 && totalMatched >= 15) finalScore = 5
     }
 
+    const maxScore = type === 'pentagon' ? 2 : 5
     res.json({
-      score: Math.min(type === 'pentagon' ? 2 : 5, Math.max(0, finalScore)),
+      score: Math.min(maxScore, Math.max(0, finalScore)),
       note: parsed.note ?? 'Analysis complete.'
     })
+
   } catch {
-    // Fallback keyword scoring if AI fails completely
+    // Full fallback — keyword scoring if AI completely fails
     const desc = (description || '').toLowerCase()
     let score = 0
-    let note = 'Analysis complete.'
+    let note = ''
 
     if (type === 'picture') {
-      const keywords = ['woman','man','boy','girl','child','kid','cookie','water','sink','stool','overflow','steal','reach','wash','dish','window']
-      const matched = keywords.filter((k: string) => desc.includes(k)).length
+      const elements: string[][] = [
+        ['woman','lady','aunty','amma','mother'],
+        ['boy','child','kid','son','small boy'],
+        ['cookie','biscuit','jar','tin'],
+        ['stool','chair','ladder','standing on'],
+        ['sink','tap','water','overflow','flood','spill'],
+        ['girl','daughter','watching','another child'],
+        ['dish','plate','vessel','tumbler','washing'],
+        ['window'],
+        ['steal','taking','reaching','climbing'],
+        ['falling','tipping','wobbling'],
+      ]
+      const matched = elements.filter(group => group.some((k:string) => desc.includes(k))).length
       score = matched >= 7 ? 5 : matched >= 5 ? 4 : matched >= 3 ? 3 : matched >= 2 ? 2 : matched >= 1 ? 1 : 0
-      note = `Identified ${matched} scene elements in description.`
+      note = `Identified ${matched} scene elements. ${matched < 5 ? 'Try to describe more details like the water overflowing and the stool tipping.' : 'Good observation of the scene.'}`
     } else if (type === 'clock') {
-      const hasCircle = desc.includes('circle') || desc.includes('round') || desc.includes('clock')
-      const hasNumbers = desc.includes('number') || desc.includes('12') || desc.includes('1')
-      const hasHands = desc.includes('hand') || desc.includes('arrow') || desc.includes('pointing')
-      score = hasCircle && hasNumbers && hasHands ? 4 : hasCircle && hasNumbers ? 3 : hasCircle ? 2 : desc.length > 5 ? 1 : 0
-      note = 'Clock drawing evaluated from description.'
+      const hasCircle  = /circle|round|oval|clock/.test(desc)
+      const hasNumbers = /number|1|2|3|12|digit/.test(desc)
+      const hasHands   = /hand|arrow|point|needle|minute|hour/.test(desc)
+      const hasError   = /wrong|not sure|couldn't|cannot|missed|off/.test(desc)
+      score = hasCircle && hasNumbers && hasHands && !hasError ? 4
+            : hasCircle && hasNumbers && hasHands ? 3
+            : hasCircle && hasNumbers ? 2
+            : hasCircle ? 1 : desc.length > 4 ? 1 : 0
+      note = 'Clock drawing evaluated from your description.'
     } else if (type === 'pentagon') {
-      const hasTwo = desc.includes('two') || desc.includes('both') || desc.includes('2')
-      const hasOverlap = desc.includes('overlap') || desc.includes('together') || desc.includes('cross')
-      score = hasTwo && hasOverlap ? 2 : hasTwo || hasOverlap ? 1 : 0
-      note = 'Pentagon drawing evaluated from description.'
+      const hasTwo     = /two|both|2|pair/.test(desc)
+      const hasOverlap = /overlap|cross|together|intersect|inside/.test(desc)
+      const hasFive    = /five|5|pentagon|sided/.test(desc)
+      score = hasTwo && hasOverlap && hasFive ? 2 : hasTwo && hasOverlap ? 1 : hasTwo || hasOverlap ? 1 : desc.length > 4 ? 0 : 0
+      note = 'Pentagon drawing evaluated from your description.'
     }
 
     res.json({ score, note })
